@@ -1,205 +1,211 @@
-# Druid Kafka Ingestion avec Protobuf et S3
+# Ingestion Sample - Complete Project
 
-Ce projet fournit une solution complète pour l'ingestion de données Kafka vers Apache Druid en utilisant des schémas Protobuf stockés sur S3, avec un pipeline CI/CD GitLab automatisé.
+Complete solution for Kafka to Apache Druid data ingestion with Protobuf and S3.
 
-## 🏗️ Architecture
+## Overview
 
-```
-Kafka Topic (Protobuf) 
-    ↓
-Druid Superviseur 
-    ↓ (lit le schema depuis)
-S3 Bucket (descriptors .desc)
-    ↓ (versionné via)
-GitLab CI/CD Pipeline
-```
+This project is organized into **three distinct modules**:
 
-## 📁 Structure du projet
+1. **[druid-ingestion](druid-ingestion/)** - Main Kafka → Druid ingestion module (production)
+2. **[kafka-producer](kafka-producer/)** - Test data generator (development)
+3. **[infrastructure](infrastructure/)** - Docker stack for local environment
+
+## Architecture
 
 ```
-druid-kafka-ingestion/
-├── .gitlab-ci.yml              # Pipeline CI/CD
-├── schemas/
-│   └── proto/
-│       └── settlement_transaction.proto  # Schéma Protobuf source
-├── druid-specs/
-│   └── templates/
-│       └── kafka-supervisor.json         # Template avec envsubst
-├── config/
-│   ├── dimensions.json          # Définition des dimensions Druid (JSON)
-│   ├── dev.env                  # Variables d'environnement dev
-│   ├── staging.env              # Variables d'environnement staging
-│   └── prod.env                 # Variables d'environnement prod
-├── scripts/
-│   ├── compile-proto.sh         # Script de compilation des .proto
-│   ├── deploy-supervisor.sh     # Script de déploiement
-│   └── rollback-schema.sh       # Script de rollback
-└── docs/
-    ├── SETUP.md                 # Guide d'installation
-    └── DEPLOYMENT.md            # Guide de déploiement
+┌─────────────────────────────────────────────────────────┐
+│                    Architecture                          │
+│                                                          │
+│  kafka-producer (test data)                             │
+│       │                                                  │
+│       │ generates                                       │
+│       ▼                                                  │
+│  Kafka Topic (Protobuf)                                 │
+│       │                                                  │
+│       │ consumes                                        │
+│       ▼                                                  │
+│  Druid Supervisor (via druid-ingestion)                 │
+│       │                                                  │
+│       │ reads schema from                               │
+│       ▼                                                  │
+│  S3 Bucket (descriptors .desc)                          │
+│       │                                                  │
+│       │ versioned via                                   │
+│       ▼                                                  │
+│  GitLab CI/CD Pipeline                                  │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## ✨ Points forts de cette solution
+## Quick Start
 
-✅ **Zero dépendance externe** - Utilise uniquement des outils natifs Linux
-- `envsubst` (pré-installé, package gettext-base)
-- `jq` (standard DevOps, ~3MB)
-- `curl` (déjà présent partout)
+### Scenario 1: Complete local testing with Docker Compose
 
-✅ **Standard de l'industrie** - Approche utilisée par Kubernetes, Docker, Nginx
-
-✅ **Simple et maintenable** - Pas de "magie", syntaxe claire
-
-✅ **Performant** - Très rapide, images Docker légères
-
-## 🚀 Démarrage rapide
-
-### Prérequis
-
-- Accès GitLab avec CI/CD activé
-- Bucket S3 configuré (ex: `my-company-druid-schemas`)
-- Credentials AWS configurés dans GitLab CI/CD
-- Cluster Druid avec accès S3
-- Cluster Kafka avec authentification SASL_SSL
-
-### Configuration initiale
-
-1. **Configurer les variables GitLab CI/CD**
-   
-   Dans `Settings > CI/CD > Variables`, ajouter :
-   - `AWS_ACCESS_KEY_ID` - Accès S3
-   - `AWS_SECRET_ACCESS_KEY` - Secret S3
-   - `KAFKA_PROD_USER` - Username Kafka production
-   - `KAFKA_PROD_PASSWORD` - Password Kafka production
-   - `S3_BUCKET` - Nom du bucket (ex: `my-company-druid-schemas`)
-   - `S3_REGION` - Région AWS (ex: `eu-west-1`)
-
-2. **Adapter les fichiers de configuration**
-   
-   Modifier les fichiers dans `config/` selon vos environnements
-
-3. **Définir votre schéma Protobuf**
-   
-   Éditer `schemas/proto/settlement_transaction.proto`
-
-4. **Définir vos dimensions Druid**
-   
-   Éditer `config/dimensions.json`
-
-### Déploiement
-
-1. **Push vers develop** → Déploie automatiquement en DEV
-2. **Push vers staging** → Déploie automatiquement en STAGING
-3. **Push vers main/master** → Déploie manuellement en PROD
-
-## 🔄 Template envsubst
-
-Le projet utilise `envsubst` pour la substitution de variables :
-
-```json
-{
-  "topic": "${KAFKA_TOPIC}",
-  "taskCount": ${TASK_COUNT:-10}
-}
-```
-
-**Syntaxe :**
-- `${VAR}` - Variable obligatoire
-- `${VAR:-default}` - Variable avec valeur par défaut
-
-## 📊 Versioning des schémas
-
-Chaque commit génère une version de schéma :
-- `s3://bucket/schemas/{COMMIT_SHA}/` - Version spécifique
-- `s3://bucket/schemas/develop-latest/` - Dernière version develop
-- `s3://bucket/schemas/stable/` - Version stable (main/master)
-
-## 🔧 Configuration Druid
-
-### Extensions requises
-```properties
-druid.extensions.loadList=["druid-s3-extensions", "druid-protobuf-extensions", "druid-kafka-indexing-service"]
-```
-
-### Configuration S3
-```properties
-druid.storage.type=s3
-druid.storage.bucket=my-company-druid-segments
-druid.s3.accessKey=${AWS_ACCESS_KEY_ID}
-druid.s3.secretKey=${AWS_SECRET_ACCESS_KEY}
-```
-
-## 🛠️ Commandes utiles
-
-### Déploiement
 ```bash
-make deploy-dev      # Déployer en DEV
-make deploy-staging  # Déployer en STAGING
-make deploy-prod     # Déployer en PRODUCTION
+# 1. Start local infrastructure (Kafka, Druid, Schema Registry)
+cd infrastructure
+docker-compose up -d
+
+# Wait for all services to be ready (~1-2 minutes)
+docker-compose ps
+
+# 2. Compile Protobuf schema
+cd ../druid-ingestion
+make compile
+
+# 3. Configure for local environment
+cp config/dev.env.local config/dev.env
+
+# 4. In another terminal: Generate test data
+cd kafka-producer
+mvn clean package exec:java
+
+# 5. Deploy Druid ingestion
+cd ../druid-ingestion
+make deploy-dev
+
+# 6. Verify
+make status ENV=dev
+# Access http://localhost:8888 for Druid console
 ```
 
-### Validation
+### Scenario 2: Deploy to production (DevOps)
+
 ```bash
-make validate        # Valider la configuration
-make compile         # Compiler les .proto
+cd druid-ingestion
+make deploy-prod
 ```
 
-### Monitoring
+### Scenario 3: Producer development only
+
 ```bash
-make status ENV=dev  # Statut du superviseur
-make logs ENV=dev    # Logs du superviseur
+cd kafka-producer
+mvn clean package exec:java
 ```
 
-### Rollback
+## Project Structure
+
+```
+injestionesample/
+├── README.md                    # This file
+├── CHANGELOG.md                 # Global changelog
+├── LICENSE                      # License
+│
+├── druid-ingestion/             # MAIN MODULE
+│   ├── README.md               # Module documentation
+│   ├── Makefile                # Deployment commands
+│   ├── config/                 # Environment configurations
+│   │   ├── dev.env.local       # Config for local Docker Compose
+│   │   ├── dimensions.json     # Druid dimensions
+│   │   ├── metrics.json        # Druid metrics
+│   │   ├── transforms.json     # Data transformations
+│   │   └── index-spec.json     # Indexing configuration
+│   ├── schemas/                # Protobuf schemas (source of truth)
+│   ├── druid-specs/            # Druid templates
+│   ├── scripts/                # Deployment scripts
+│   └── docs/                   # Module documentation
+│
+├── kafka-producer/              # TEST MODULE
+│   ├── README.md               # Module documentation
+│   ├── pom.xml                 # Maven configuration
+│   └── src/                    # Java source code
+│
+└── infrastructure/              # INFRASTRUCTURE
+    ├── README.md               # Module documentation
+    ├── docker-compose.yml      # Complete stack
+    └── .env.example            # Configuration template
+```
+
+## Documentation
+
+### By module
+
+- **[druid-ingestion/README.md](druid-ingestion/README.md)** - Druid ingestion guide
+- **[kafka-producer/README.md](kafka-producer/README.md)** - Kafka producer guide
+- **[infrastructure/README.md](infrastructure/README.md)** - Local infrastructure guide
+
+## Prerequisites
+
+### For druid-ingestion
+- `envsubst`, `jq`, `protoc`, `curl`, `aws-cli` (optional)
+- Access to a Druid cluster
+- Access to a Kafka cluster with SASL_SSL
+- S3 bucket for schemas (or local file for development)
+
+### For kafka-producer
+- Java 11+
+- Maven 3.6+
+- Accessible Kafka cluster
+
+### For infrastructure
+- Docker 20.10+
+- Docker Compose 2.0+
+- 8GB+ RAM available
+
+## Security
+
+- **WARNING:** Secrets must never be committed
+- Use `.env.example` as template
+- Environment variables at runtime
+- GitLab CI/CD Variables for production
+- Secret managers (AWS Secrets Manager, Vault) recommended
+
+## Useful Commands
+
+### Infrastructure
 ```bash
-make rollback ENV=prod VERSION=abc123f
+cd infrastructure
+docker-compose up -d          # Start all services
+docker-compose ps             # Check status
+docker-compose down           # Stop
+docker-compose logs -f        # Real-time logs
+docker-compose logs -f kafka  # Specific service logs
 ```
 
-### Compilation manuelle
+### Kafka Producer
 ```bash
-./scripts/compile-proto.sh
+cd kafka-producer
+mvn clean package             # Compile
+mvn exec:java                 # Execute
 ```
 
-### Test local
+### Druid Ingestion
 ```bash
-source config/dev.env
-export DIMENSIONS_JSON=$(cat config/dimensions.json | jq -c .)
-envsubst < druid-specs/templates/kafka-supervisor.json > test-output.json
-jq . test-output.json  # Vérifier le JSON
+cd druid-ingestion
+make deploy-dev               # Deploy to DEV
+make status ENV=dev           # Status
+make logs ENV=dev             # Logs
+make rollback ENV=prod VERSION=abc123f  # Rollback
 ```
 
-## 📖 Documentation
+## Troubleshooting
 
-- [Guide d'installation détaillé](docs/SETUP.md)
-- [Guide de déploiement](docs/DEPLOYMENT.md)
-- [Démarrage rapide 5 minutes](QUICKSTART.md)
+See each module's README for specific troubleshooting:
+- [druid-ingestion troubleshooting](druid-ingestion/README.md#troubleshooting)
+- [kafka-producer troubleshooting](kafka-producer/README.md#troubleshooting)
+- [infrastructure troubleshooting](infrastructure/README.md#troubleshooting)
 
-## 🔒 Sécurité
+## Development Workflow
 
-- Les credentials sont stockés dans GitLab CI/CD Variables (masqués)
-- Descriptors S3 accessibles en lecture seule par Druid
-- SASL_SSL activé pour Kafka
+```
+1. Modify Proto schema
+   └─> druid-ingestion/schemas/proto/
 
-## 🐛 Troubleshooting
+2. Compile schema
+   └─> cd druid-ingestion && make compile
 
-### Le superviseur ne démarre pas
-1. Vérifier le descriptor sur S3
-2. Vérifier les permissions IAM
-3. Consulter les logs Druid
+3. Test locally
+   └─> infrastructure/docker-compose.yml
+   └─> kafka-producer to generate data
+   └─> druid-ingestion to deploy
 
-### Erreurs de parsing Protobuf
-1. Vérifier `protoMessageType`
-2. Vérifier compilation avec `--include_imports`
-
-### JSON invalide
-```bash
-jq empty supervisor-spec.json  # Valider
+4. Deploy to production
+   └─> cd druid-ingestion && make deploy-prod
 ```
 
-## 📝 License
+## License
 
-Propriétaire - Usage interne uniquement
+Proprietary - Internal use only
 
-## 👥 Contributeurs
+## Team
 
-Votre équipe Data Engineering
+Your Data Engineering Team

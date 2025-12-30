@@ -1,0 +1,105 @@
+{
+  "type": "kafka",
+  "spec": {
+    "ioConfig": {
+      "type": "kafka",
+      "consumerProperties": {
+        "bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
+        "security.protocol": "${KAFKA_SECURITY_PROTOCOL}",
+        "sasl.mechanism": "${KAFKA_SASL_MECHANISM}",
+        "sasl.jaas.config": "${KAFKA_SASL_JAAS_CONFIG}",
+        "ssl.endpoint.identification.algorithm": "${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM}",
+        "group.id": "druid-${DATASOURCE_NAME}-${ENVIRONMENT}",
+        "fetch.min.bytes": ${KAFKA_FETCH_MIN_BYTES},
+        "fetch.max.wait.ms": ${KAFKA_FETCH_MAX_WAIT_MS},
+        "max.poll.records": ${KAFKA_MAX_POLL_RECORDS},
+        "session.timeout.ms": ${KAFKA_SESSION_TIMEOUT_MS},
+        "heartbeat.interval.ms": ${KAFKA_HEARTBEAT_INTERVAL_MS},
+        "max.poll.interval.ms": ${KAFKA_MAX_POLL_INTERVAL_MS},
+        "enable.auto.commit": false,
+        "auto.offset.reset": "${KAFKA_AUTO_OFFSET_RESET}"
+      },
+      "topic": "${KAFKA_TOPIC}",
+      "inputFormat": {
+        "type": "protobuf",
+        "protoBytesDecoder": {
+          "type": "${PROTO_DECODER_TYPE}",
+          "descriptor": "${PROTO_DESCRIPTOR_PATH_CLEAN}",
+          "protoMessageType": "${PROTO_MESSAGE_TYPE}"
+        }
+      },
+      "useEarliestOffset": ${USE_EARLIEST_OFFSET},
+      "useTransaction": ${USE_TRANSACTION},
+      "taskCount": ${TASK_COUNT},
+      "replicas": ${REPLICAS},
+      "taskDuration": "${TASK_DURATION}",
+      "startDelay": "${START_DELAY}",
+      "period": "${PERIOD}",
+      "completionTimeout": "${COMPLETION_TIMEOUT}",
+      "lateMessageRejectionPeriod": "${LATE_MESSAGE_REJECTION_PERIOD}",
+      "pollTimeout": ${POLL_TIMEOUT},
+      "minimumMessageTime": "${MINIMUM_MESSAGE_TIME}"
+    },
+    "tuningConfig": {
+      "type": "kafka",
+      "maxRowsInMemory": ${MAX_ROWS_IN_MEMORY},
+      "maxBytesInMemory": ${MAX_BYTES_IN_MEMORY},
+      "maxRowsPerSegment": ${MAX_ROWS_PER_SEGMENT},
+      "maxTotalRows": null,
+      "intermediatePersistPeriod": "${INTERMEDIATE_PERSIST_PERIOD}",
+      "maxPendingPersists": ${MAX_PENDING_PERSISTS},
+      "indexSpec": ${INDEX_SPEC_JSON},
+      "indexSpecForIntermediatePersists": ${INDEX_SPEC_JSON},
+      "reportParseExceptions": ${REPORT_PARSE_EXCEPTIONS},
+      "handoffConditionTimeout": ${HANDOFF_CONDITION_TIMEOUT},
+      "resetOffsetAutomatically": ${RESET_OFFSET_AUTOMATICALLY},
+      "workerThreads": null,
+      "chatThreads": null,
+      "chatRetries": ${CHAT_RETRIES},
+      "httpTimeout": "${HTTP_TIMEOUT}",
+      "shutdownTimeout": "${SHUTDOWN_TIMEOUT}",
+      "offsetFetchPeriod": "${OFFSET_FETCH_PERIOD}",
+      "intermediateHandoffPeriod": "${INTERMEDIATE_HANDOFF_PERIOD}",
+      "logParseExceptions": ${LOG_PARSE_EXCEPTIONS},
+      "maxParseExceptions": ${MAX_PARSE_EXCEPTIONS},
+      "maxSavedParseExceptions": ${MAX_SAVED_PARSE_EXCEPTIONS},
+      "skipSequenceNumberAvailabilityCheck": ${SKIP_SEQUENCE_NUMBER_AVAILABILITY_CHECK},
+      "partitionsSpec": {
+        "type": "${PARTITIONS_SPEC_TYPE}",
+        "partitionDimensions": ${SECONDARY_PARTITION_DIMENSIONS},
+        "targetRowsPerSegment": ${TARGET_ROWS_PER_SEGMENT}
+      },
+      "splitHintSpec": {
+        "type": "maxSize",
+        "maxSplitSize": ${MAX_SPLIT_SIZE},
+        "maxInputSegmentBytesPerTask": ${MAX_INPUT_SEGMENT_BYTES_PER_TASK}
+      }
+    },
+    "dataSchema": {
+      "dataSource": "${DATASOURCE_NAME}",
+      "timestampSpec": {
+        "column": "${TIMESTAMP_COLUMN}",
+        "format": "${TIMESTAMP_FORMAT}",
+        "missingValue": null
+      },
+      "transformSpec": {
+        "transforms": ${TRANSFORMS_JSON},
+        "filter": ${TX_TYPE_VALIDATION_FILTER}
+      },
+      "dimensionsSpec": {
+        "dimensions": ${DIMENSIONS_JSON},
+        "dimensionExclusions": ["settlement_ts", "settlement_entry_ts", "acceptance_ts", "payee_access_manager_id"],
+        "includeAllDimensions": false,
+        "useSchemaDiscovery": false
+      },
+      "metricsSpec": ${METRICS_JSON},
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "${SEGMENT_GRANULARITY}",
+        "queryGranularity": "${QUERY_GRANULARITY}",
+        "rollup": ${ROLLUP},
+        "intervals": null
+      }
+    }
+  }
+}

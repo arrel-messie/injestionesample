@@ -1,0 +1,37 @@
+[
+  {
+    "type": "expression",
+    "name": "tx_type",
+    "expression": "upper(txType)"
+  },
+  {
+    "type": "expression",
+    "name": "status",
+    "expression": "upper(status)"
+  },
+  {
+    "type": "expression",
+    "name": "currency",
+    "expression": "upper(currency)"
+  },
+  {
+    "type": "expression",
+    "name": "payer_access_manager_bic",
+    "expression": "upper(payerAccessManagerBic)"
+  },
+  {
+    "type": "expression",
+    "name": "payee_access_manager_bic",
+    "expression": "upper(payeeAccessManagerBic)"
+  },
+  {
+    "type": "expression",
+    "name": "reason_code",
+    "expression": "upper(reasonCode)"
+  },
+  {
+    "type": "expression",
+    "name": "payment_type_code",
+    "expression": "upper(paymentTypeCode)"
+  }
+]

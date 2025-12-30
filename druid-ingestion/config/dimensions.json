@@ -1,0 +1,42 @@
+[
+  {
+    "type": "string",
+    "name": "uetr"
+  },
+  {
+    "type": "string",
+    "name": "rtgs_business_date"
+  },
+  {
+    "type": "string",
+    "name": "tx_type"
+  },
+  {
+    "type": "string",
+    "name": "status"
+  },
+  {
+    "type": "string",
+    "name": "currency"
+  },
+  {
+    "type": "string",
+    "name": "payer_access_manager_bic"
+  },
+  {
+    "type": "string",
+    "name": "payer_access_manager_id"
+  },
+  {
+    "type": "string",
+    "name": "payee_access_manager_bic"
+  },
+  {
+    "type": "string",
+    "name": "reason_code"
+  },
+  {
+    "type": "string",
+    "name": "payment_type_code"
+  }
+]

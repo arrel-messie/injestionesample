@@ -1,0 +1,42 @@
+# Build artifacts
+kafka-producer/target/
+*.class
+*.jar
+*.war
+
+# Generated files
+druid-ingestion/supervisor-spec-*.json
+druid-ingestion/druid-specs/generated/
+druid-ingestion/schemas/compiled/
+test-output.json
+
+# Environment files (ne jamais commiter les secrets)
+*.env
+!druid-ingestion/config/*.env.example
+infrastructure/.env
+infrastructure/*.env
+!infrastructure/.env.example
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+

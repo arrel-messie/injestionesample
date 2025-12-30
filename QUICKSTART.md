@@ -1,54 +1,105 @@
-# 🚀 Démarrage Rapide - 5 minutes
+# Quick Start
 
-Ce guide vous permet de démarrer rapidement avec le projet d'ingestion Druid.
+This guide helps you get started quickly with the Druid ingestion project.
 
-## Étape 1 : Extraction (30 secondes)
+## Option 1: Local testing with Docker Compose (Recommended for beginners)
+
+### Step 1: Automatic setup (2 minutes)
+
+```bash
+cd druid-ingestion
+make test-local
+```
+
+This script will:
+- Start all Docker Compose services
+- Compile Protobuf schema
+- Create Kafka topic
+- Configure local environment
+
+### Step 2: Generate test data (1 minute)
+
+```bash
+# In another terminal
+cd kafka-producer
+mvn clean package exec:java
+```
+
+The producer generates messages every 30 seconds. Let it run for a few minutes.
+
+### Step 3: Deploy Druid ingestion (1 minute)
+
+The template automatically uses the `PROTO_DESCRIPTOR_PATH` variable defined in `dev.env.local`.
+
+```bash
+make deploy-dev
+```
+
+The template will generate the spec with `file://` path for local testing, or `s3://` for production based on the environment variable.
+
+### Step 4: Verify (30 seconds)
+
+```bash
+# Check status
+make status ENV=dev
+
+# Access web interfaces
+open http://localhost:8888  # Druid Console
+open http://localhost:8090  # Druid Overlord
+open http://localhost:8084  # AKHQ (Kafka UI)
+```
+
+See [TESTING_LOCAL.md](druid-ingestion/docs/TESTING_LOCAL.md) for the complete guide.
+
+## Option 2: Production deployment (GitLab CI/CD)
+
+### Step 1: Extraction (30 seconds)
 
 ```bash
 unzip druid-kafka-ingestion.zip
 cd druid-kafka-ingestion
 ```
 
-## Étape 2 : Vérifier les dépendances (30 secondes)
+## Step 2: Check dependencies (30 seconds)
 
 ```bash
 make check-deps
 ```
 
-**Dépendances requises** (déjà présentes sur la plupart des systèmes Linux) :
-- `envsubst` (gettext-base) - ✅ Pré-installé
-- `jq` (~3MB) - Installation : `apt-get install jq`
-- `protoc` - Installation : `apt-get install protobuf-compiler`
-- `curl` - ✅ Pré-installé
+**Required dependencies** (already present on most Linux systems):
+- `envsubst` (gettext-base) - Pre-installed
+- `jq` (~3MB) - Installation: `apt-get install jq`
+- `protoc` - Installation: `apt-get install protobuf-compiler`
+- `curl` - Pre-installed
 
-**Installation rapide Ubuntu/Debian :**
+**Quick installation Ubuntu/Debian:**
 ```bash
 make install-deps-ubuntu
 ```
 
-**Installation rapide macOS :**
+**Quick installation macOS:**
 ```bash
 make install-deps-macos
 ```
 
-## Étape 3 : Configuration GitLab (2 minutes)
+## Step 3: GitLab configuration (2 minutes)
 
-1. **Créer un nouveau projet GitLab** et push le code
+1. **Create a new GitLab project** and push the code
 
-2. **Configurer les variables CI/CD**
+2. **Configure CI/CD variables**
    
-   Dans `Settings > CI/CD > Variables` :
+   In `Settings > CI/CD > Variables`:
    
-   | Variable | Valeur | Masked |
+   | Variable | Value | Masked |
    |----------|--------|--------|
-   | `AWS_ACCESS_KEY_ID` | `AKIA...` | Non |
-   | `AWS_SECRET_ACCESS_KEY` | `secret...` | Oui ✓ |
-   | `S3_BUCKET` | `my-company-druid-schemas` | Non |
-   | `S3_REGION` | `eu-west-1` | Non |
-   | `KAFKA_PROD_USER` | `prod-user` | Non |
-   | `KAFKA_PROD_PASSWORD` | `prod-pass` | Oui ✓ |
+   | `AWS_ACCESS_KEY_ID` | `AKIA...` | No |
+   | `AWS_SECRET_ACCESS_KEY` | `secret...` | Yes |
+   | `S3_BUCKET` | `my-company-druid-schemas` | No |
+   | `S3_REGION` | `eu-west-1` | No |
+   | `KAFKA_PROD_USER` | `prod-user` | No |
+   | `KAFKA_PROD_PASSWORD` | `prod-pass` | Yes |
 
-3. **Créer les branches**
+3. **Create branches**
    ```bash
    git checkout -b develop
    git push origin develop
@@ -56,88 +107,117 @@ make install-deps-macos
    git push origin staging
    ```
 
-## Étape 4 : Adapter les configurations (2 minutes)
+## Step 4: Adapt configurations (2 minutes)
 
-### 1. Modifier `config/dev.env`
+### 1. Modify `config/dev.env`
 ```bash
 vim config/dev.env
 
-# Adapter ces valeurs :
-KAFKA_BOOTSTRAP_SERVERS="votre-kafka:9092"
-DRUID_OVERLORD_URL="http://votre-druid:8090"
-PROTO_MESSAGE_TYPE="votre.package.MessageType"
+# Adapt these values:
+KAFKA_BOOTSTRAP_SERVERS="your-kafka:9092"
+DRUID_OVERLORD_URL="http://your-druid:8090"
+PROTO_MESSAGE_TYPE="your.package.MessageType"
 ```
 
-### 2. Modifier `schemas/proto/settlement_transaction.proto`
-Adapter selon votre structure de données
+### 2. Modify `schemas/proto/settlement_transaction.proto`
+Adapt according to your data structure (currently: `PaymentTransactionEvent`)
 
-### 3. Modifier `config/dimensions.json`
-Définir vos dimensions Druid en JSON
+### 3. Modify JSON configuration files
+- `config/dimensions.json` - Druid dimensions
+- `config/metrics.json` - Druid metrics
+- `config/transforms.json` - Data transformations
+- `config/index-spec.json` - Indexing configuration
 
-## Étape 5 : Premier déploiement (30 secondes)
+## Step 5: First deployment (30 seconds)
 
 ```bash
-# Commit et push vers develop
+# Commit and push to develop
 git add config/ schemas/
 git commit -m "Configure for our environment"
 git push origin develop
 
-# Le pipeline GitLab CI/CD va automatiquement :
-# ✅ Compiler le .proto en .desc
-# ✅ Uploader vers S3
-# ✅ Déployer en DEV
+# GitLab CI/CD pipeline will automatically:
+# - Compile .proto to .desc
+# - Upload to S3
+# - Deploy to DEV
 ```
 
-## Étape 6 : Vérification (30 secondes)
+## Step 6: Verification (30 seconds)
 
-**Vérifier le pipeline GitLab :**
-- Aller dans CI/CD > Pipelines
-- Tous les jobs doivent être verts ✅
+**Check GitLab pipeline:**
+- Go to CI/CD > Pipelines
+- All jobs must be green
 
-**Vérifier le superviseur Druid :**
+**Check Druid supervisor:**
 ```bash
 make status ENV=dev
 ```
 
-Ou via la console : `http://votre-druid:8090/unified-console.html#supervisors`
+Or via console: `http://your-druid:8090/unified-console.html#supervisors`
 
-## 🛠️ Commandes essentielles
+## Essential Commands
 
 ```bash
-# Déploiement
-make deploy-dev          # Déployer en DEV
-make deploy-staging      # Déployer en STAGING
-make deploy-prod         # Déployer en PRODUCTION
+# Deployment
+make deploy-dev          # Deploy to DEV
+make deploy-staging      # Deploy to STAGING
+make deploy-prod         # Deploy to PRODUCTION
 
 # Validation
-make validate            # Valider les configs
-make compile             # Compiler les .proto
-make test-template ENV=dev  # Tester la génération
+make validate            # Validate configs
+make compile             # Compile .proto
+make test-template ENV=dev  # Test generation
 
 # Monitoring
-make status ENV=dev      # Statut du superviseur
-make logs ENV=dev        # Logs du superviseur
+make status ENV=dev      # Supervisor status
+make logs ENV=dev        # Supervisor logs
 
 # Rollback
 make rollback ENV=prod VERSION=abc123f
 ```
 
-## 🔧 Test local avant GitLab
+## Local testing before GitLab
+
+### With Docker Compose (Recommended)
 
 ```bash
-# Compiler localement
-make compile
+# 1. Start infrastructure
+cd infrastructure
+docker-compose up -d
 
-# Tester la génération du template
+# 2. Compile and validate
+cd ../druid-ingestion
+make compile
+make validate
+
+# 3. Test template generation
 make test-template ENV=dev
 
-# Valider le JSON
+# 4. Generate test data
+cd ../kafka-producer
+mvn clean package exec:java
+
+# 5. Deploy ingestion
+cd ../druid-ingestion
+make deploy-dev
+```
+
+### Without Docker Compose
+
+```bash
+# Compile locally
+make compile
+
+# Test template generation
+make test-template ENV=dev
+
+# Validate JSON
 make validate
 ```
 
-## 📋 Syntaxe envsubst (utilisée dans les templates)
+## envsubst syntax (used in templates)
 
-Le projet utilise `envsubst` pour substituer les variables :
+The project uses `envsubst` to substitute variables:
 
 ```json
 {
@@ -146,51 +226,55 @@ Le projet utilise `envsubst` pour substituer les variables :
 }
 ```
 
-**Syntaxe :**
-- `${VAR}` - Variable obligatoire
-- `${VAR:-default}` - Variable avec valeur par défaut
+**Syntax:**
+- `${VAR}` - Required variable
+- `${VAR:-default}` - Variable with default value
 
-## 🐛 Troubleshooting rapide
+## Quick Troubleshooting
 
-### envsubst non trouvé
+### envsubst not found
 ```bash
 sudo apt-get install gettext-base
 ```
 
-### jq non trouvé
+### jq not found
 ```bash
 sudo apt-get install jq
 ```
 
-### Le superviseur ne démarre pas
+### Supervisor does not start
 ```bash
-# Vérifier les logs
+# Check logs
 make logs ENV=dev
 
-# Vérifier le schéma sur S3
+# Check schema on S3
 make list-schemas
 ```
 
-### JSON invalide
+### Invalid JSON
 ```bash
-# Tester localement
+# Test locally
 make test-template ENV=dev
 jq . test-output.json
 ```
 
-## 📖 Documentation complète
+## Complete Documentation
 
-- **README.md** - Vue d'ensemble
-- **docs/SETUP.md** - Installation détaillée
-- **docs/DEPLOYMENT.md** - Procédures de déploiement
+- **README.md** - Project overview
+- **druid-ingestion/README.md** - Ingestion module documentation
+- **druid-ingestion/docs/SETUP.md** - Detailed installation
+- **druid-ingestion/docs/DEPLOYMENT.md** - Deployment procedures
+- **druid-ingestion/docs/MONITORING.md** - Monitoring and validation
+- **druid-ingestion/docs/PARTITIONING.md** - Partitioning configuration
+- **infrastructure/README.md** - Docker Compose infrastructure guide
 
-## ✨ Avantages de cette solution
+## Advantages of this solution
 
-✅ **Zero dépendance externe** - Outils natifs Linux uniquement  
-✅ **Standard de l'industrie** - envsubst utilisé par Kubernetes, Docker  
-✅ **Simple et rapide** - Pas de "magie", syntaxe claire  
-✅ **Performant** - Très rapide, images Docker légères  
+- **Zero external dependency** - Native Linux tools only  
+- **Industry standard** - envsubst used by Kubernetes, Docker  
+- **Simple and fast** - No "magic", clear syntax  
+- **Performant** - Very fast, lightweight Docker images  
 
 ---
 
-**Prêt à déployer ? Lancez-vous !** 🚀
+**Ready to deploy? Let's go!**

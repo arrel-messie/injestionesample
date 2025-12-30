@@ -1,0 +1,12 @@
+[
+  {
+    "type": "count",
+    "name": "count"
+  },
+  {
+    "type": "doubleSum",
+    "name": "amount_sum",
+    "fieldName": "amount"
+  }
+]
+

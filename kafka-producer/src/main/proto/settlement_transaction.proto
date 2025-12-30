@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package com.company;
+
+import "google/protobuf/timestamp.proto";
+option java_package = "com.company.transc.v1";
+option java_multiple_files = true;
+
+message PaymentTransactionEvent {
+  enum SettlementTransactionType {
+    ONLINE_FUNDING = 0;
+    ONLINE_DEFUNDING = 1;
+    SIMPLE_PAYMENT = 2;
+    COMBINED_PAYMENT = 3;
+  }
+  
+  enum PaymentType {
+    PAYMENT_TYPE_UNSPECIFIED = 0;
+    ECOMM = 1;
+    POS_ONLINE = 2;
+    POS_OFFLINE = 3;
+    SWITCHING = 4;
+    P2P = 5;
+    OTHER_NON_CHARGEABLE = 6;
+  }
+  
+  string uetr = 1;
+  google.protobuf.Timestamp settlement_ts = 2;
+  google.protobuf.Timestamp settlement_entry_ts = 3;
+  google.protobuf.Timestamp acceptance_ts = 4;
+  string rtgs_business_date = 5;
+  string tx_type = 6;
+  string status = 7;
+  double amount = 8;
+  string currency = 9;
+  string payer_access_manager_bic = 10;
+  string payer_access_manager_id = 11;
+  string payee_access_manager_bic = 12;
+  string payee_access_manager_id = 13;
+  string reason_code = 14;
+  string payment_type_code = 15;
+  int64 settlement_timestamp_ms = 16;  // Timestamp in milliseconds since epoch (calculated from settlement_ts)
+}
