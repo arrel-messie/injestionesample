@@ -1,4 +1,4 @@
-.PHONY: help compile validate deploy-dev deploy-staging deploy-prod rollback clean status logs check-deps install-deps init test-template list-schemas suspend resume reset restart tasks test-local
+.PHONY: help compile validate deploy-dev deploy-staging deploy-prod rollback clean status logs check-deps install-deps init test-template list-schemas suspend resume reset restart tasks test-local fix-permissions
 
 help: ## Show help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
@@ -12,7 +12,7 @@ install-deps: ## Install dependencies (Ubuntu/Debian)
 	@sudo apt-get update && sudo apt-get install -y protobuf-compiler jq gettext-base curl
 
 compile: ## Compile Protobuf schemas
-	@./scripts/compile-proto.sh
+	@bash scripts/compile-proto.sh
 
 validate: ## Validate JSON configs
 	@for f in dimensions metrics transforms index-spec; do \
@@ -21,24 +21,28 @@ validate: ## Validate JSON configs
 
 test-template: ## Test template generation (ENV=dev)
 	@[ -n "$(ENV)" ] || { echo "ERROR: ENV required"; exit 1; }
-	@OUTPUT=$$(./scripts/generate-spec.sh $(ENV) test druid-specs/generated/test-output.json); \
+	@OUTPUT=$$(bash scripts/generate-spec.sh $(ENV) test druid-specs/generated/test-output.json); \
 		echo "\n=== Generated supervisor spec ==="; \
 		jq . $$OUTPUT | head -40
+
+fix-permissions: ## Fix script permissions
+	@chmod +x scripts/*.sh
+	@echo "Script permissions fixed"
 
 init: check-deps compile validate ## Initialize project
 
 deploy-dev: ## Deploy to dev
-	@./scripts/deploy-supervisor.sh dev
+	@bash scripts/deploy-supervisor.sh dev
 
 deploy-staging: ## Deploy to staging
-	@./scripts/deploy-supervisor.sh staging
+	@bash scripts/deploy-supervisor.sh staging
 
 deploy-prod: ## Deploy to prod
-	@./scripts/deploy-supervisor.sh prod
+	@bash scripts/deploy-supervisor.sh prod
 
 rollback: ## Rollback schema (ENV=prod VERSION=abc123f)
 	@[ -n "$(ENV)" ] && [ -n "$(VERSION)" ] || { echo "ERROR: ENV and VERSION required"; exit 1; }
-	@./scripts/rollback-schema.sh $(VERSION) $(ENV)
+	@bash scripts/rollback-schema.sh $(VERSION) $(ENV)
 
 status: ## Get supervisor status (ENV=dev)
 	@[ -n "$(ENV)" ] || { echo "ERROR: ENV required"; exit 1; }
@@ -84,7 +88,7 @@ list-schemas: ## List S3 schema versions
 	@aws s3 ls s3://$(S3_BUCKET)/schemas/ 2>/dev/null | grep "PRE" | awk '{print $$2}' || echo "None"
 
 test-local: ## Setup local Docker environment
-	@./scripts/test-local.sh
+	@bash scripts/test-local.sh
 
 clean: ## Clean generated files
 	@rm -rf schemas/compiled/ druid-specs/generated/ test-output.json
