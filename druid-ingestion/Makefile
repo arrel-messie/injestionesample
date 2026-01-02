@@ -21,9 +21,9 @@ validate: ## Validate JSON configs
 
 test-template: ## Test template generation (ENV=dev)
 	@[ -n "$(ENV)" ] || { echo "ERROR: ENV required"; exit 1; }
-	@./scripts/deploy-supervisor.sh $(ENV) test-version 2>&1 | grep -v "^Deploying" | grep -v "^Generated" || true
-	@echo "\n=== Generated supervisor spec ==="
-	@jq . druid-specs/generated/supervisor-spec-$(ENV).json | head -40
+	@OUTPUT=$$(./scripts/generate-spec.sh $(ENV) test druid-specs/generated/test-output.json); \
+		echo "\n=== Generated supervisor spec ==="; \
+		jq . $$OUTPUT | head -40
 
 init: check-deps compile validate ## Initialize project
 
