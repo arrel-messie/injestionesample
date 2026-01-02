@@ -8,62 +8,59 @@ This module configures and deploys Druid supervisors for Kafka data ingestion in
 
 ## Quick Start
 
-### Local testing with Docker Compose
+### Build the application
 
 ```bash
 cd druid-ingestion
-make test-local      # Setup Docker Compose environment
-# Then in another terminal: generate data with kafka-producer
-# Then: make deploy-dev
+mvn clean package
 ```
 
 ### Production deployment
 
 ```bash
-cd druid-ingestion
-make deploy-dev      # Deploy to DEV
-make deploy-staging  # Deploy to STAGING
-make deploy-prod     # Deploy to PRODUCTION
+# Build and deploy
+mvn clean package
+java -jar target/druid-ingestion-1.0.0.jar deploy -e dev      # Deploy to DEV
+java -jar target/druid-ingestion-1.0.0.jar deploy -e staging  # Deploy to STAGING
+java -jar target/druid-ingestion-1.0.0.jar deploy -e prod     # Deploy to PRODUCTION
 ```
 
 ## Prerequisites
 
-- `envsubst` (gettext-base package)
-- `jq` (JSON parser)
-- `protoc` (Protobuf compiler)
-- `curl` (HTTP client)
-- `aws-cli` (optional, for manual rollback)
+- **Java 11+** (required)
+- **Maven 3.6+** (required)
+- `protoc` (Protobuf compiler, for schema compilation)
+- `jq` (optional, for JSON pretty-printing in test-template)
 
 ```bash
-make check-deps      # Check dependencies
-make install-deps    # Install dependencies (Ubuntu/Debian)
+# Check Java and Maven
+java -version
+mvn -version
+
+# Install dependencies (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install -y openjdk-11-jdk maven protobuf-compiler
 ```
 
 ## Structure
 
 ```
 druid-ingestion/
-├── config/              # Environment configurations
-│   ├── dev.env
-│   ├── staging.env
-│   ├── prod.env
-│   ├── dev.env.example  # Template for dev.env
-│   ├── dimensions.json
-│   ├── metrics.json
-│   ├── transforms.json
-│   └── index-spec.json
-├── druid-specs/         # Druid supervisor specifications
-│   ├── templates/      # Template files
-│   │   └── kafka-supervisor.json
-│   └── generated/       # Generated supervisor specs (gitignored)
+├── config/              # Configuration files
+│   ├── dev.env          # Environment variables (dev)
+│   ├── staging.env      # Environment variables (staging)
+│   ├── prod.env         # Environment variables (prod)
+│   └── schema.json      # Unified schema definition (dimensions, metrics, transforms, index)
+├── druid-specs/         # Generated supervisor specs (gitignored)
+│   └── generated/
 │       └── supervisor-spec-*.json
-├── schemas/             # Protobuf schemas (source of truth)
-│   └── proto/
-│       └── settlement_transaction.proto
-├── scripts/             # Deployment scripts
-│   ├── compile-proto.sh
-│   ├── deploy-supervisor.sh
-│   └── rollback-schema.sh
+├── schemas/             # Protobuf schemas
+│   ├── proto/
+│   │   └── settlement_transaction.proto
+│   └── compiled/
+│       └── settlement_transaction.desc
+├── src/main/java/       # Java application source
+│   └── com/company/druid/ingestion/
+│       └── DruidIngestion.java       # Main application (single file)
 └── docs/                # Documentation
     ├── SETUP.md
     └── DEPLOYMENT.md
@@ -71,13 +68,20 @@ druid-ingestion/
 
 ## Configuration
 
+### Architecture
+
+The supervisor spec is built directly in Java code using:
+- **`config/{env}.env`**: Environment-specific configuration (Kafka, Druid URLs, etc.)
+- **`config/schema.json`**: Schema definitions (dimensions, metrics, transforms, index-spec)
+
+The Java application constructs the complete Druid supervisor spec JSON programmatically.
+
 ### 1. Environment configuration
 
-```bash
-# Copy template for development
-cp config/dev.env.example config/dev.env
+Environment-specific variables are stored in `config/{env}.env` files:
 
-# Edit with your values
+```bash
+# Edit environment configuration
 vim config/dev.env
 ```
 
@@ -86,46 +90,62 @@ vim config/dev.env
 - GitLab CI/CD Variables (for production)
 - Secret managers (AWS Secrets Manager, Vault, etc.)
 
-### 2. Required variables
+### 2. Schema configuration
 
-For each environment, the following variables are mandatory:
-- `KAFKA_BOOTSTRAP_SERVERS`
-- `KAFKA_TOPIC`
-- `DATASOURCE_NAME`
-- `DRUID_OVERLORD_URL`
+The `config/schema.json` file contains the schema definitions (dimensions, metrics, transforms, index-spec) that are shared across all environments.
+
+### 3. Required variables
+
+For each environment, the following variables are mandatory in `config/{env}.env`:
+- `DRUID_OVERLORD_URL` (for deployment)
 
 ## Available Commands
 
-### Deployment
+### Build
+
 ```bash
-make deploy-dev      # Deploy to DEV
-make deploy-staging  # Deploy to STAGING
-make deploy-prod     # Deploy to PRODUCTION
+mvn clean package
 ```
 
-### Validation
+### Deployment
+
 ```bash
-make validate        # Validate JSON configuration
-make compile         # Compile Protobuf schemas
-make test-template ENV=dev  # Test template generation
+# Deploy to environment
+java -jar target/druid-ingestion-1.0.0.jar deploy -e dev      # Deploy to DEV
+java -jar target/druid-ingestion-1.0.0.jar deploy -e staging  # Deploy to STAGING
+java -jar target/druid-ingestion-1.0.0.jar deploy -e prod      # Deploy to PRODUCTION
+```
+
+### Build supervisor spec
+
+```bash
+# Build spec for testing
+java -jar target/druid-ingestion-1.0.0.jar build -e dev -o druid-specs/generated/test-output.json
+
+# View generated spec
+jq . druid-specs/generated/test-output.json
 ```
 
 ### Monitoring
+
 ```bash
-make status ENV=dev  # Supervisor status
-make logs ENV=dev    # Supervisor logs
+# Get supervisor status
+java -jar target/druid-ingestion-1.0.0.jar status -e dev
 ```
 
-### Rollback
+### Compile Protobuf schemas
+
 ```bash
-make rollback ENV=prod VERSION=abc123f
+mvn generate-sources
+# or
+mvn clean package  # Compiles protos automatically
 ```
 
-### Utilities
+### Help
+
 ```bash
-make check-deps      # Check dependencies
-make clean           # Clean generated files
-make list-schemas    # List versions on S3
+java -jar target/druid-ingestion-1.0.0.jar --help
+java -jar target/druid-ingestion-1.0.0.jar deploy --help
 ```
 
 ## Documentation

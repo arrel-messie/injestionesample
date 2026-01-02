@@ -59,22 +59,24 @@ This generates `schemas/compiled/settlement_transaction.desc`
 
 ## Step 3: Configure for local environment (1 minute)
 
-The template uses a `PROTO_DESCRIPTOR_PATH` variable that can point to:
-- A local file: `file:///opt/shared/schemas/settlement_transaction.desc`
-- An S3 file: `s3://bucket/schemas/version/file.desc` (default if not defined)
+The supervisor spec uses the `PROTO_DESCRIPTOR_PATH` from the override file, which can point to:
+- A local file: `file:///opt/shared/schemas/settlement_transaction.desc` (for Docker Compose)
+- An S3 file: `s3://bucket/schemas/version/file.desc` (for production)
 
 ```bash
-# Copy local configuration
-cp config/dev.env.local config/dev.env
+# Copy example configuration for local testing
+cp config/dev.env.example config/dev.env
 
-# The dev.env.local file already contains:
+# The dev.env.example file already contains defaults for local Docker Compose:
 # - PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
-# - KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
-# - DRUID_OVERLORD_URL="http://localhost:8090"
+# - KAFKA_BOOTSTRAP_SERVERS="kafka:29092" (for Docker) or "localhost:9092" (for host)
+# - DRUID_OVERLORD_URL="http://localhost:8888"
 # - No SASL (KAFKA_SASL_JAAS_CONFIG empty)
+# 
+# Adjust values in dev.env if needed for your local setup
 ```
 
-The template will automatically generate the correct path based on the environment variable.
+The `dev-overrides.json` file already contains the local file path. The build script merges it with the base configuration.
 
 ## Step 4: Create Kafka topic (30 seconds)
 
@@ -105,17 +107,17 @@ mvn clean package exec:java
 
 ## Step 6: Deploy Druid ingestion (1 minute)
 
-The template automatically uses the `PROTO_DESCRIPTOR_PATH` variable defined in `dev.env.local`.
+The supervisor spec uses the `PROTO_DESCRIPTOR_PATH` from `dev.env` (copied from `dev.env.example`).
 
 ```bash
-# The dev.env.local file already contains:
+# The dev.env file (from dev.env.example) contains:
 # PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
 
-# Deploy (script will automatically use the correct path)
+# Deploy (script will automatically use the correct path from dev.env)
 make deploy-dev
 ```
 
-The template will generate the spec with `file://` path for local testing, or `s3://` for production based on the environment variable.
+The build script generates the spec with `file://` path for local testing, or `s3://` for production based on the override file configuration.
 
 ## Step 7: Verify ingestion (1 minute)
 
@@ -157,7 +159,7 @@ volumes:
   - ../druid-ingestion/schemas/compiled:/opt/shared/schemas:ro
 ```
 
-The `config/dev.env.local` file is already configured to use the local path.
+The `config/dev.env` file (copied from `dev.env.example`) is already configured to use the local path.
 
 ## Complete test script
 

@@ -90,9 +90,14 @@ injestionesample/
 ├── CHANGELOG.md                 # Global changelog
 ├── LICENSE                      # License
 │
-├── druid-ingestion/             # MAIN MODULE
+├── schemas/                     # Shared Protobuf schemas (source of truth)
+│   └── proto/
+│       └── settlement_transaction.proto
+│
+├── druid-ingestion/             # MAIN MODULE (Java application)
 │   ├── README.md               # Module documentation
-│   ├── Makefile                # Deployment commands
+│   ├── pom.xml                 # Maven build
+│   ├── src/main/java/          # Java source code
 │   ├── config/                 # Environment configurations
 │   │   ├── dev.env.local       # Config for local Docker Compose
 │   │   ├── dimensions.json     # Druid dimensions

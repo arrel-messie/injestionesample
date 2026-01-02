@@ -1,0 +1,3 @@
+# Preserve executable permissions for shell scripts
+scripts/*.sh text eol=lf
+
