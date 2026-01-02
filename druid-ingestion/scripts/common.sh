@@ -35,10 +35,10 @@ validate_vars() {
     local config_file=$1
     shift
     for var in "$@"; do
-        [ -z "${!var:-}" ] && {
+        if [ -z "${!var:-}" ]; then
             echo "ERROR: Variable not set: $var in $config_file" >&2
             exit 1
-        }
+        fi
     done
 }
 

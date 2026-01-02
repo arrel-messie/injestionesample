@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eu
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
@@ -18,26 +18,40 @@ validate_vars "$MODULE_ROOT/config/${ENV}.env" \
     KAFKA_BOOTSTRAP_SERVERS KAFKA_TOPIC DATASOURCE_NAME
 
 # Export config vars
-export SCHEMA_VERSION ENVIRONMENT="$ENV"
-export KAFKA_BOOTSTRAP_SERVERS KAFKA_SASL_JAAS_CONFIG KAFKA_TOPIC
-export KAFKA_SECURITY_PROTOCOL KAFKA_SASL_MECHANISM KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
-export PROTO_DESCRIPTOR_FILE PROTO_MESSAGE_TYPE
-export DATASOURCE_NAME TIMESTAMP_COLUMN TIMESTAMP_FORMAT
+export SCHEMA_VERSION
+export ENVIRONMENT="$ENV"
+export KAFKA_BOOTSTRAP_SERVERS
+export KAFKA_SASL_JAAS_CONFIG="${KAFKA_SASL_JAAS_CONFIG:-}"
+export KAFKA_TOPIC
+export KAFKA_SECURITY_PROTOCOL
+export KAFKA_SASL_MECHANISM
+export KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}"
+export PROTO_DESCRIPTOR_FILE
+export PROTO_MESSAGE_TYPE
+export DATASOURCE_NAME
+export TIMESTAMP_COLUMN
+export TIMESTAMP_FORMAT
 export DRUID_OVERLORD_URL="${DRUID_OVERLORD_URL:-}"
 export SECONDARY_PARTITION_DIMENSIONS="${SECONDARY_PARTITION_DIMENSIONS:-[]}"
 export S3_BUCKET="${S3_BUCKET:-my-company-druid-schemas}"
 export TX_TYPE_VALIDATION_FILTER="${TX_TYPE_VALIDATION_FILTER:-null}"
 
 # Load JSON configs
-load_json() {
-    local file="$MODULE_ROOT/config/$1"
+for json_file in dimensions metrics transforms index-spec; do
+    file="$MODULE_ROOT/config/${json_file}.json"
     check_file "$file"
-    jq -c . "$file" || { echo "ERROR: Invalid JSON: $file" >&2; exit 1; }
-}
-export DIMENSIONS_JSON=$(load_json "dimensions.json")
-export METRICS_JSON=$(load_json "metrics.json")
-export TRANSFORMS_JSON=$(load_json "transforms.json")
-export INDEX_SPEC_JSON=$(load_json "index-spec.json")
+    json_content=$(jq -c . "$file" 2>&1)
+    if [ $? -ne 0 ] || [ -z "$json_content" ]; then
+        echo "ERROR: Invalid JSON: $file" >&2
+        exit 1
+    fi
+    case "$json_file" in
+        dimensions) export DIMENSIONS_JSON="$json_content" ;;
+        metrics) export METRICS_JSON="$json_content" ;;
+        transforms) export TRANSFORMS_JSON="$json_content" ;;
+        index-spec) export INDEX_SPEC_JSON="$json_content" ;;
+    esac
+done
 
 # Set defaults
 export KAFKA_FETCH_MIN_BYTES="${KAFKA_FETCH_MIN_BYTES:-1048576}"
