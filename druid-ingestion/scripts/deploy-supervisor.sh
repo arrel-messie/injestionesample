@@ -1,81 +1,42 @@
 #!/bin/bash
-# deploy-supervisor.sh - Deploy Druid Kafka supervisor
-
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-[ $# -lt 1 ] && {
-    echo "Usage: $0 <environment> [schema_version]" >&2
-    exit 1
-}
+[ $# -lt 1 ] && { echo "Usage: $0 <environment> [schema_version]" >&2; exit 1; }
 
-ENVIRONMENT=$1
-SCHEMA_VERSION=${2:-"${ENVIRONMENT}-latest"}
-export SCHEMA_VERSION
+ENV=$1
+SCHEMA_VERSION=${2:-"${ENV}-latest"}
 
-validate_environment "$ENVIRONMENT"
+validate_environment "$ENV"
 for cmd in envsubst jq curl; do check_command "$cmd"; done
 
-echo "Deploying to $ENVIRONMENT (schema: $SCHEMA_VERSION)"
-
-load_config "$ENVIRONMENT"
-validate_vars "$MODULE_ROOT/config/${ENVIRONMENT}.env" \
+load_config "$ENV"
+validate_vars "$MODULE_ROOT/config/${ENV}.env" \
     KAFKA_BOOTSTRAP_SERVERS KAFKA_TOPIC DATASOURCE_NAME DRUID_OVERLORD_URL
 
-# Export all variables needed by envsubst (load_config sources the file but doesn't export)
+# Export config vars
+export SCHEMA_VERSION ENVIRONMENT="$ENV"
 export KAFKA_BOOTSTRAP_SERVERS KAFKA_SASL_JAAS_CONFIG KAFKA_TOPIC
 export KAFKA_SECURITY_PROTOCOL KAFKA_SASL_MECHANISM KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
 export PROTO_DESCRIPTOR_FILE PROTO_MESSAGE_TYPE
-export DATASOURCE_NAME TIMESTAMP_COLUMN TIMESTAMP_FORMAT
-export DRUID_OVERLORD_URL ENVIRONMENT
+export DATASOURCE_NAME TIMESTAMP_COLUMN TIMESTAMP_FORMAT DRUID_OVERLORD_URL
 export SECONDARY_PARTITION_DIMENSIONS="${SECONDARY_PARTITION_DIMENSIONS:-[]}"
-export PROTO_DESCRIPTOR_PATH="${PROTO_DESCRIPTOR_PATH:-}"
 export S3_BUCKET="${S3_BUCKET:-my-company-druid-schemas}"
-export MINIMUM_MESSAGE_TIME="${MINIMUM_MESSAGE_TIME:-1970-01-01T00:00:00.000Z}"
+export TX_TYPE_VALIDATION_FILTER="${TX_TYPE_VALIDATION_FILTER:-null}"
 
-# Load dimensions
-DIMENSIONS_FILE="$MODULE_ROOT/config/dimensions.json"
-check_file "$DIMENSIONS_FILE"
-DIMENSIONS_JSON=$(jq -c . "$DIMENSIONS_FILE" 2>/dev/null) || {
-    echo "ERROR: Invalid JSON in dimensions file: $DIMENSIONS_FILE" >&2
-    exit 1
+# Load JSON configs
+load_json() {
+    local file="$MODULE_ROOT/config/$1"
+    check_file "$file"
+    jq -c . "$file" || { echo "ERROR: Invalid JSON: $file" >&2; exit 1; }
 }
-export DIMENSIONS_JSON
+export DIMENSIONS_JSON=$(load_json "dimensions.json")
+export METRICS_JSON=$(load_json "metrics.json")
+export TRANSFORMS_JSON=$(load_json "transforms.json")
+export INDEX_SPEC_JSON=$(load_json "index-spec.json")
 
-# Load metrics
-METRICS_FILE="$MODULE_ROOT/config/metrics.json"
-check_file "$METRICS_FILE"
-METRICS_JSON=$(jq -c . "$METRICS_FILE" 2>/dev/null) || {
-    echo "ERROR: Invalid JSON in metrics file: $METRICS_FILE" >&2
-    exit 1
-}
-export METRICS_JSON
-
-# Load transforms
-TRANSFORMS_FILE="$MODULE_ROOT/config/transforms.json"
-check_file "$TRANSFORMS_FILE"
-TRANSFORMS_JSON=$(jq -c . "$TRANSFORMS_FILE" 2>/dev/null) || {
-    echo "ERROR: Invalid JSON in transforms file: $TRANSFORMS_FILE" >&2
-    exit 1
-}
-export TRANSFORMS_JSON
-
-# Load index spec
-INDEX_SPEC_FILE="$MODULE_ROOT/config/index-spec.json"
-check_file "$INDEX_SPEC_FILE"
-INDEX_SPEC_JSON=$(jq -c . "$INDEX_SPEC_FILE" 2>/dev/null) || {
-    echo "ERROR: Invalid JSON in index-spec file: $INDEX_SPEC_FILE" >&2
-    exit 1
-}
-export INDEX_SPEC_JSON
-
-if [ -z "${TX_TYPE_VALIDATION_FILTER:-}" ] || [ "${TX_TYPE_VALIDATION_FILTER}" = "null" ]; then
-    export TX_TYPE_VALIDATION_FILTER="null"
-fi
-
-
-# Set default values for variables used in template (envsubst doesn't support ${VAR:-default})
+# Set defaults
 export KAFKA_FETCH_MIN_BYTES="${KAFKA_FETCH_MIN_BYTES:-1048576}"
 export KAFKA_FETCH_MAX_WAIT_MS="${KAFKA_FETCH_MAX_WAIT_MS:-500}"
 export KAFKA_MAX_POLL_RECORDS="${KAFKA_MAX_POLL_RECORDS:-500}"
@@ -119,70 +80,45 @@ export SEGMENT_GRANULARITY="${SEGMENT_GRANULARITY:-DAY}"
 export QUERY_GRANULARITY="${QUERY_GRANULARITY:-NONE}"
 export ROLLUP="${ROLLUP:-false}"
 
-# Handle PROTO_DESCRIPTOR_PATH with default S3 path if not set
+# Handle descriptor path
 if [ -z "${PROTO_DESCRIPTOR_PATH:-}" ]; then
-    export PROTO_DESCRIPTOR_PATH="s3://${S3_BUCKET:-my-company-druid-schemas}/schemas/${SCHEMA_VERSION:-${ENVIRONMENT}-latest}/${PROTO_DESCRIPTOR_FILE:-settlement_transaction.desc}"
+    export PROTO_DESCRIPTOR_PATH="s3://${S3_BUCKET}/schemas/${SCHEMA_VERSION}/${PROTO_DESCRIPTOR_FILE:-settlement_transaction.desc}"
 fi
-export PROTO_DESCRIPTOR_PATH
-
-# Determine decoder type and path format
+[[ "$PROTO_DESCRIPTOR_PATH" != file://* && "$PROTO_DESCRIPTOR_PATH" != s3://* ]] && \
+    export PROTO_DESCRIPTOR_PATH="file://${PROTO_DESCRIPTOR_PATH}"
+export PROTO_DESCRIPTOR_PATH_CLEAN="$PROTO_DESCRIPTOR_PATH"
 export PROTO_DECODER_TYPE="file"
-# Keep file:// prefix for local paths (Druid FileBasedProtobufBytesDecoder expects file:// prefix)
-# Keep s3:// prefix for S3 paths
-if [[ "${PROTO_DESCRIPTOR_PATH}" == file://* ]]; then
-    export PROTO_DESCRIPTOR_PATH_CLEAN="${PROTO_DESCRIPTOR_PATH}"
-elif [[ "${PROTO_DESCRIPTOR_PATH}" == s3://* ]]; then
-    export PROTO_DESCRIPTOR_PATH_CLEAN="${PROTO_DESCRIPTOR_PATH}"
-else
-    # Assume local file path (add file:// prefix)
-    export PROTO_DESCRIPTOR_PATH_CLEAN="file://${PROTO_DESCRIPTOR_PATH}"
-fi
-export PROTO_DECODER_TYPE
-export PROTO_DESCRIPTOR_PATH_CLEAN
 
-TEMPLATE_FILE="$MODULE_ROOT/druid-specs/templates/kafka-supervisor.json"
-OUTPUT_DIR="$MODULE_ROOT/druid-specs/generated"
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_FILE="$OUTPUT_DIR/supervisor-spec-${ENVIRONMENT}.json"
-check_file "$TEMPLATE_FILE"
+# Generate spec
+TEMPLATE="$MODULE_ROOT/druid-specs/templates/kafka-supervisor.json"
+OUTPUT="$MODULE_ROOT/druid-specs/generated/supervisor-spec-${ENV}.json"
+check_file "$TEMPLATE"
+mkdir -p "$(dirname "$OUTPUT")"
 
-envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE" || {
-    echo "ERROR: Failed to generate supervisor spec from template" >&2
-    exit 1
-}
+envsubst < "$TEMPLATE" > "$OUTPUT"
+jq empty "$OUTPUT" || { echo "ERROR: Invalid JSON generated" >&2; exit 1; }
 
-jq empty "$OUTPUT_FILE" 2>/dev/null || {
-    echo "ERROR: Generated supervisor spec contains invalid JSON" >&2
-    exit 1
-}
+echo "Deploying to $ENV (schema: $SCHEMA_VERSION)"
+jq -r '"  Datasource: \(.spec.dataSchema.dataSource)\n  Topic: \(.spec.ioConfig.topic)\n  Tasks: \(.spec.ioConfig.taskCount)"' "$OUTPUT"
 
-echo "Generated supervisor spec: $OUTPUT_FILE"
-jq -r '"  Datasource: \(.spec.dataSchema.dataSource)\n  Topic: \(.spec.ioConfig.topic)\n  Tasks: \(.spec.ioConfig.taskCount)"' "$OUTPUT_FILE"
-
-# Production confirmation
-[ "$ENVIRONMENT" = "prod" ] && {
-    echo ""
+[ "$ENV" = "prod" ] && {
     read -p "Deploy to PRODUCTION? (yes/no): " -r
-    [[ ! $REPLY =~ ^[Yy]es$ ]] && { echo "Deployment cancelled"; exit 0; }
+    [[ ! $REPLY =~ ^[Yy]es$ ]] && { echo "Cancelled"; exit 0; }
 }
 
-# Deploy to Druid
-echo "Deploying supervisor to Druid..."
-TMP_RESPONSE=$(mktemp)
-HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TMP_RESPONSE" \
-    -X POST -H 'Content-Type: application/json' \
-    -d @"$OUTPUT_FILE" \
-    "${DRUID_OVERLORD_URL}/druid/indexer/v1/supervisor" || echo "000")
-RESPONSE_BODY=$(cat "$TMP_RESPONSE" 2>/dev/null || echo "")
-rm -f "$TMP_RESPONSE"
+# Deploy
+TMP=$(mktemp)
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TMP" -X POST -H 'Content-Type: application/json' \
+    -d @"$OUTPUT" "${DRUID_OVERLORD_URL}/druid/indexer/v1/supervisor" || echo "000")
+RESPONSE=$(cat "$TMP")
+rm -f "$TMP"
 
 if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
     echo "Deployment successful (HTTP $HTTP_CODE)"
-    [ -n "$RESPONSE_BODY" ] && echo "$RESPONSE_BODY" | jq . 2>/dev/null || echo "$RESPONSE_BODY"
-    echo ""
+    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
     echo "Druid console: ${DRUID_OVERLORD_URL}/unified-console.html#supervisors"
 else
     echo "ERROR: Deployment failed (HTTP $HTTP_CODE)" >&2
-    [ -n "$RESPONSE_BODY" ] && echo "$RESPONSE_BODY" | jq . 2>/dev/null || echo "$RESPONSE_BODY"
+    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
     exit 1
 fi
