@@ -19,17 +19,11 @@ validate: ## Validate JSON configs
 		jq empty config/$$f.json || { echo "ERROR: Invalid JSON: config/$$f.json"; exit 1; }; \
 	done
 
-test-template: ## Test template (ENV=dev)
+test-template: ## Test template generation (ENV=dev)
 	@[ -n "$(ENV)" ] || { echo "ERROR: ENV required"; exit 1; }
-	@source config/$(ENV).env && \
-		export SCHEMA_VERSION="test" \
-		DIMENSIONS_JSON=$$(jq -c . config/dimensions.json) \
-		METRICS_JSON=$$(jq -c . config/metrics.json) \
-		TRANSFORMS_JSON=$$(jq -c . config/transforms.json) \
-		INDEX_SPEC_JSON=$$(jq -c . config/index-spec.json) && \
-		mkdir -p druid-specs/generated && \
-		envsubst < druid-specs/templates/kafka-supervisor.json > druid-specs/generated/test-output.json && \
-		jq . druid-specs/generated/test-output.json | head -30
+	@./scripts/deploy-supervisor.sh $(ENV) test-version 2>&1 | grep -v "^Deploying" | grep -v "^Generated" || true
+	@echo "\n=== Generated supervisor spec ==="
+	@jq . druid-specs/generated/supervisor-spec-$(ENV).json | head -40
 
 init: check-deps compile validate ## Initialize project
 
