@@ -6,22 +6,14 @@ Solution shell professionnelle et industrialisable avec séparation des responsa
 
 Solution shell modulaire et maintenable pour gérer les déploiements de supervisors Druid, avec une architecture similaire à la version Java mais en bash.
 
-## ✅ Architecture Modulaire
+## ✅ Architecture Simplifiée
 
 ```
 druid-ingestion/
-├── druid-ingestion.sh          # Point d'entrée principal (orchestration)
-├── lib/                        # Modules réutilisables
-│   ├── logger.sh               # Logging centralisé
-│   ├── validator.sh             # Validation des entrées
-│   ├── config.sh                # Chargement des configs (defaults.yml, .env, schema.yml)
-│   ├── spec-builder.sh         # Génération de spec depuis template
-│   ├── http-client.sh           # Client HTTP avec retry
-│   └── prerequisites.sh         # Vérification des outils
-├── commands/                    # Commandes séparées
-│   ├── build.sh                # Commande build
-│   ├── deploy.sh               # Commande deploy
-│   └── status.sh               # Commande status
+├── druid-ingestion.sh          # Script principal (tout-en-un)
+├── lib/                        # Modules complexes uniquement
+│   ├── config.sh               # Chargement des configs (defaults.yml, .env, schema.yml)
+│   └── spec-builder.sh         # Génération de spec depuis template
 ├── templates/                   # Templates JSON
 │   └── supervisor-spec.json.template
 └── config/                      # Configurations externes
@@ -31,6 +23,8 @@ druid-ingestion/
     ├── staging.env              # Variables d'environnement staging
     └── prod.env                 # Variables d'environnement prod
 ```
+
+**Philosophie** : Structure simple, pas d'over-engineering. Seuls les modules complexes (config, spec-builder) sont séparés. Le reste est intégré dans le script principal.
 
 ## 📋 Prérequis
 
@@ -100,14 +94,16 @@ PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
 
 ## 🔧 Fonctionnalités
 
-### Séparation des responsabilités
+### Architecture simplifiée
 
-- **`lib/logger.sh`** : Logging centralisé avec couleurs
-- **`lib/validator.sh`** : Validation des entrées
-- **`lib/config.sh`** : Chargement et fusion des configs
-- **`lib/spec-builder.sh`** : Construction de la spec JSON
-- **`lib/http-client.sh`** : Requêtes HTTP avec retry
-- **`lib/prerequisites.sh`** : Vérification des outils
+- **`druid-ingestion.sh`** : Script principal avec toutes les fonctions simples intégrées
+  - Logging avec couleurs
+  - Validation des entrées
+  - Requêtes HTTP avec retry simplifié
+  - Vérification des prérequis
+  - Commandes build/deploy/status
+- **`lib/config.sh`** : Chargement et fusion des configs (complexe, séparé)
+- **`lib/spec-builder.sh`** : Construction de la spec JSON (complexe, séparé)
 
 ### Templating
 
@@ -115,18 +111,12 @@ PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
 - Génération de spec via `jq` pour manipulation JSON propre
 - Substitution des variables depuis configs externes
 
-### Commandes modulaires
-
-- **`commands/build.sh`** : Génère la spec JSON
-- **`commands/deploy.sh`** : Déploie vers Druid
-- **`commands/status.sh`** : Récupère le statut
-
 ### Gestion d'erreurs
 
 - `set -euo pipefail` : Arrêt sur erreur
 - Validation des paramètres
 - Messages d'erreur clairs
-- Retry logic pour HTTP
+- Retry logic simplifié pour HTTP
 
 ## 📝 Exemples
 
@@ -155,30 +145,29 @@ PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
 
 | Aspect | Shell | Java |
 |--------|-------|------|
-| **Structure** | Modulaire (lib/, commands/) | Modulaire (packages) |
+| **Structure** | Simplifiée (1 script + 2 modules) | Modulaire (packages) |
 | **Templating** | Template JSON + jq | Construction directe |
 | **Configs** | defaults.yml + .env + schema.yml | defaults.yml + .env + schema.yml |
-| **Lignes** | ~600 (modulaire) | ~1095 |
+| **Lignes** | ~706 (simplifié) | ~1095 |
+| **Fichiers** | 3 fichiers shell | ~20 fichiers Java |
 | **Dépendances** | jq, curl, yq | Maven + 8 libs |
-| **Maintenabilité** | Excellente (modules) | Excellente (packages) |
+| **Maintenabilité** | Excellente (simple) | Excellente (packages) |
 
 ## 🎓 Pour un développeur Java
 
 ### Points familiers
 
-1. **Modules** : `lib/` = packages Java
-2. **Commandes** : `commands/` = classes de commande
+1. **Script principal** : `druid-ingestion.sh` = classe principale avec méthodes utilitaires
+2. **Modules complexes** : `lib/` = classes complexes séparées
 3. **Templates** : `templates/` = templates de configuration
 4. **Configs** : `config/` = fichiers de configuration
-5. **Logging** : `lib/logger.sh` = logger Java
-6. **Validation** : `lib/validator.sh` = validation Java
 
-### Architecture similaire
+### Philosophie de simplicité
 
-- **Séparation des responsabilités** : Chaque module a une responsabilité unique
-- **Réutilisabilité** : Modules importables (`source`)
-- **Testabilité** : Modules testables indépendamment
-- **Extensibilité** : Facile d'ajouter de nouvelles commandes
+- **Pas d'over-engineering** : Seuls les modules complexes sont séparés
+- **Fonctions simples intégrées** : Logging, validation, HTTP dans le script principal
+- **Facile à comprendre** : Tout est visible dans un seul fichier principal
+- **Maintenable** : Moins de fichiers = moins de complexité
 
 ## 🔍 Debugging
 
