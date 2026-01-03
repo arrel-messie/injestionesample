@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Logger module - Simple logging functions
+# Logger
 #
 
 [ -z "${RED:-}" ] && readonly RED='\033[0;31m'
