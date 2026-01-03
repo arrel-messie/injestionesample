@@ -16,7 +16,7 @@ _load_config() {
     fi
     
     set -a
-    source "$env_file"
+    source "$env_file" || { set +a; return 1; }
     set +a
     
     local required=("DRUID_URL" "DATASOURCE" "KAFKA_BOOTSTRAP_SERVERS" "KAFKA_TOPIC")
