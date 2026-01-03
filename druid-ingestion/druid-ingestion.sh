@@ -129,7 +129,11 @@ EOF
 main() {
     check_prerequisites
     case "${1:-help}" in
-        build|compile-proto|deploy|status) "cmd_$1" "${@:2}" ;;
+        build|compile-proto|deploy|status)
+            if ! "cmd_$1" "${@:2}"; then
+                exit 1
+            fi
+            ;;
         help|--help|-h) usage ;;
         *) error_exit "Unknown: $1. Use '$0 help'" ;;
     esac
