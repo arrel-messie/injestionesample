@@ -1,5 +1,7 @@
 package com.company.druid;
 
+import com.company.druid.config.Config;
+import com.company.druid.spec.SpecBuilder;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +47,7 @@ class SpecBuilderTest {
         var spec = builder.build(config, "dev");
         var dataSchema = (ObjectNode) spec.get("spec").get("dataSchema");
         
-        assertEquals(config.datasource(), dataSchema.get("dataSource").asText());
+        assertEquals(config.druid().datasource(), dataSchema.get("dataSource").asText());
         assertTrue(dataSchema.has("timestampSpec"));
         assertTrue(dataSchema.has("dimensionsSpec"));
         assertTrue(dataSchema.has("metricsSpec"));

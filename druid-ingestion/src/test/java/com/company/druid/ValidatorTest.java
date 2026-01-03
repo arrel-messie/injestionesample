@@ -1,6 +1,7 @@
 package com.company.druid;
 
 import com.company.druid.exceptions.ValidationException;
+import com.company.druid.util.Validator;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

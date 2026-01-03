@@ -47,8 +47,7 @@ transforms:
     expression: upper(paymentTypeCode)
 
 indexSpec:
-  bitmap:
-    type: roaring
+  bitmapType: roaring
   dimensionCompression: lz4
   metricCompression: lz4
   longEncoding: longs

@@ -1,4 +1,4 @@
-package com.company.druid;
+package com.company.druid.util;
 
 import com.company.druid.exceptions.ValidationException;
 
