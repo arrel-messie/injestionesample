@@ -53,7 +53,7 @@ load_config() {
         set -a
         source "$env_file"
         set +a
-    } || log_warn "Environment file not found: $env_file"
+    }
     
     # Validate DRUID_URL if set
     [ -n "${DRUID_URL:-}" ] && [[ ! "${DRUID_URL}" =~ ^https?:// ]] && {
