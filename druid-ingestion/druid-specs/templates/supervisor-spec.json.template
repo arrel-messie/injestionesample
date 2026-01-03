@@ -28,10 +28,10 @@
           "protoMessageType": "${PROTO_MESSAGE_TYPE}"
         }
       },
-      "useEarliestOffset": ${TASK_USE_EARLIEST_OFFSET},
-      "useTransaction": ${TASK_USE_TRANSACTION},
+      "useEarliestOffset": ${USE_EARLIEST_OFFSET},
+      "useTransaction": ${USE_TRANSACTION},
       "taskCount": ${TASK_COUNT},
-      "replicas": ${TASK_REPLICAS},
+      "replicas": ${REPLICAS},
       "taskDuration": "${TASK_DURATION}",
       "startDelay": "${TASK_START_DELAY}",
       "period": "${TASK_PERIOD}",
