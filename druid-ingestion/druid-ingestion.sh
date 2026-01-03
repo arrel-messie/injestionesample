@@ -94,6 +94,27 @@ cmd_build() {
     build_spec "$env" "$output" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
 
+cmd_compile_proto() {
+    local proto_file="${1:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
+    local output="${2:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
+    
+    log_info "Compiling protobuf descriptor: $proto_file"
+    
+    if ! command -v protoc >/dev/null 2>&1; then
+        error_exit "protoc not found. Install with: brew install protobuf (macOS) or apt-get install protobuf-compiler (Linux)"
+    fi
+    
+    local proto_dir="$(dirname "$proto_file")"
+    mkdir -p "$(dirname "$output")"
+    
+    protoc --descriptor_set_out="$output" \
+           --proto_path="$proto_dir" \
+           "$proto_file" || error_exit "Failed to compile protobuf"
+    
+    log_info "✅ Protobuf descriptor compiled: $output"
+    echo "$output"
+}
+
 cmd_deploy() {
     local env="$1"
     log_info "Deploying supervisor for environment: $env"
@@ -133,9 +154,10 @@ Druid Ingestion Manager - Shell Solution
 Usage: $0 <command> [options]
 
 Commands:
-    build       Build supervisor specification JSON
-    deploy      Deploy supervisor to Druid Overlord
-    status      Get supervisor status
+    build           Build supervisor specification JSON
+    compile-proto   Compile protobuf descriptor file
+    deploy          Deploy supervisor to Druid Overlord
+    status          Get supervisor status
 
 Options:
     -e, --env   Environment (dev, staging, prod) [required]
@@ -144,6 +166,7 @@ Options:
 Examples:
     $0 build -e dev
     $0 build -e dev -o /tmp/spec.json
+    $0 compile-proto
     $0 deploy -e dev
     $0 status -e dev
 EOF
@@ -168,6 +191,17 @@ main() {
             done
             [ -z "$env" ] && error_exit "Environment (-e) is required"
             cmd_build "$env" "$output" || exit 1
+            ;;
+        compile-proto)
+            local proto_file="" output=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    -f|--file) proto_file="$2"; shift 2 ;;
+                    -o|--output) output="$2"; shift 2 ;;
+                    *) error_exit "Unknown option: $1" ;;
+                esac
+            done
+            cmd_compile_proto "$proto_file" "$output" || exit 1
             ;;
         deploy)
             local env=""
