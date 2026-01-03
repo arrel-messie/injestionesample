@@ -32,6 +32,11 @@ parse_opts() {
     ENV="$_env" OUTPUT="$_output" FILE="$_file"
 }
 
+_validate_env() {
+    [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
+    [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
+}
+
 http_request() {
     local method="$1" url="$2" data_file="${3:-}"
     local opts=(-s -w "\n%{http_code}" -X "$method")
@@ -40,8 +45,7 @@ http_request() {
         || opts+=(-H "Accept: application/json")
     
     local response=$(curl "${opts[@]}" "$url" 2>&1) || return 1
-    local code=$(echo "$response" | tail -n1)
-    local body=$(echo "$response" | sed '$d')
+    local code=$(echo "$response" | tail -n1) body=$(echo "$response" | sed '$d')
     
     [[ "$code" =~ ^2[0-9]{2}$ ]] && echo "$body" && return 0
     [[ "$code" =~ ^[45][0-9]{2}$ ]] && log_error "HTTP $code: $body" && return 1
@@ -50,8 +54,7 @@ http_request() {
 
 cmd_build() {
     parse_opts "$@"
-    [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
-    [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
+    _validate_env
     build_spec "$ENV" "$OUTPUT" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
 
@@ -59,34 +62,32 @@ cmd_compile_proto() {
     parse_opts "$@"
     FILE="${FILE:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
     OUTPUT="${OUTPUT:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
-
+    
     [[ ! -f "$FILE" ]] && error_exit "Proto file not found: $FILE"
     command -v protoc >/dev/null || error_exit "protoc not found. Install: brew install protobuf"
     
-    mkdir -p "$(dirname "$OUTPUT")" || error_exit "Failed to create output directory"
-    protoc --descriptor_set_out="$OUTPUT" --proto_path="$(dirname "$FILE")" "$FILE" || error_exit "Failed to compile proto"
-    [[ -f "$OUTPUT" ]] || error_exit "Output file not created: $OUTPUT"
+    mkdir -p "$(dirname "$OUTPUT")"
+    protoc --descriptor_set_out="$OUTPUT" --proto_path="$(dirname "$FILE")" "$FILE" || error_exit "Compilation failed"
+    [[ -f "$OUTPUT" ]] || error_exit "Output not created: $OUTPUT"
     echo "$OUTPUT"
 }
 
 cmd_deploy() {
     parse_opts "$@"
-    [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
-    [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
+    _validate_env
     
     build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
     
     local spec="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${ENV}.json"
-    [[ ! -f "$spec" ]] && error_exit "Spec file not found: $spec"
-
+    [[ ! -f "$spec" ]] && error_exit "Spec not found: $spec"
+    
     http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec" | jq '.' || cat
     log_info "Deployed: $DATASOURCE"
 }
 
 cmd_status() {
     parse_opts "$@"
-    [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
-    [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
+    _validate_env
     
     build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
     
@@ -116,6 +117,7 @@ Examples:
   $0 status -e dev
 EOF
 }
+
 main() {
     check_prerequisites
     case "${1:-help}" in
@@ -124,4 +126,5 @@ main() {
         *) error_exit "Unknown: $1. Use '$0 help'" ;;
     esac
 }
+
 main "$@"
