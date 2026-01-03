@@ -90,7 +90,6 @@ cmd_status() {
     pretty_json "$response"
 }
 
-# Usage
 usage() {
     cat << EOF
 Usage: $0 <command> [options]
