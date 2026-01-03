@@ -2,7 +2,6 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
-# Load configuration from environment .env file (contains all values)
 load_config() {
     local env="${1:-}" config_dir="${2:-}"
     
