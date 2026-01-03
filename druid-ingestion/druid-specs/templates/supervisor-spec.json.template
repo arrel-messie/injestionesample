@@ -46,7 +46,7 @@
       "maxBytesInMemory": ${MAX_BYTES_IN_MEMORY},
       "maxRowsPerSegment": ${MAX_ROWS_PER_SEGMENT},
       "maxTotalRows": null,
-      "intermediatePersistPeriod": "PT10M",
+      "intermediatePersistPeriod": "${INTERMEDIATE_PERSIST_PERIOD}",
       "maxPendingPersists": ${MAX_PENDING_PERSISTS},
       "reportParseExceptions": ${REPORT_PARSE_EXCEPTIONS},
       "handoffConditionTimeout": ${HANDOFF_CONDITION_TIMEOUT},
