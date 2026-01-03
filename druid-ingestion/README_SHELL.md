@@ -1,32 +1,51 @@
 # Druid Ingestion Manager - Shell Solution
 
-Solution shell professionnelle et industrialisable pour gérer les déploiements de supervisors Druid.
+Solution shell professionnelle et industrialisable avec séparation des responsabilités, templating et utilisation des configs externes.
 
 ## 🎯 Objectif
 
-Cette solution shell remplace l'application Java par des scripts bash professionnels, maintenables et faciles à comprendre pour un développeur Java.
+Solution shell modulaire et maintenable pour gérer les déploiements de supervisors Druid, avec une architecture similaire à la version Java mais en bash.
 
-## ✅ Avantages
+## ✅ Architecture Modulaire
 
-- **Simple** : Scripts bash faciles à comprendre
-- **Léger** : Pas de compilation, pas de JAR
-- **Rapide** : Exécution directe
-- **Standard** : Utilise `jq`, `yq`, `curl` (outils standard)
-- **Maintenable** : Code structuré avec fonctions réutilisables
+```
+druid-ingestion/
+├── druid-ingestion.sh          # Point d'entrée principal (orchestration)
+├── lib/                        # Modules réutilisables
+│   ├── logger.sh               # Logging centralisé
+│   ├── validator.sh             # Validation des entrées
+│   ├── config.sh                # Chargement des configs (defaults.yml, .env, schema.yml)
+│   ├── spec-builder.sh         # Génération de spec depuis template
+│   ├── http-client.sh           # Client HTTP avec retry
+│   └── prerequisites.sh         # Vérification des outils
+├── commands/                    # Commandes séparées
+│   ├── build.sh                # Commande build
+│   ├── deploy.sh               # Commande deploy
+│   └── status.sh               # Commande status
+├── templates/                   # Templates JSON
+│   └── supervisor-spec.json.template
+└── config/                      # Configurations externes
+    ├── defaults.yml             # Valeurs par défaut
+    ├── schema.yml               # Schéma Druid (dimensions, metrics, transforms, index)
+    ├── dev.env                  # Variables d'environnement dev
+    ├── staging.env              # Variables d'environnement staging
+    └── prod.env                 # Variables d'environnement prod
+```
 
 ## 📋 Prérequis
 
 ```bash
 # macOS
-brew install jq yq
+brew install jq curl gettext yq
 
 # Ubuntu/Debian
-sudo apt-get install -y jq yq curl
+sudo apt-get install -y jq curl gettext-base yq
 
 # Vérifier
 jq --version
-yq --version
 curl --version
+envsubst --version
+yq --version
 ```
 
 ## 🚀 Utilisation
@@ -52,24 +71,23 @@ curl --version
 ./druid-ingestion.sh status -e dev
 ```
 
-## 📁 Structure
-
-```
-druid-ingestion/
-├── druid-ingestion.sh      # Script principal
-├── config/
-│   ├── defaults.yml        # Valeurs par défaut
-│   ├── schema.yml          # Schéma Druid (dimensions, metrics, etc.)
-│   ├── dev.env             # Configuration dev
-│   ├── staging.env         # Configuration staging
-│   └── prod.env            # Configuration prod
-└── druid-specs/
-    └── generated/          # Specs générées
-```
-
 ## ⚙️ Configuration
 
-### 1. Fichier `.env` par environnement
+### 1. Fichier `defaults.yml`
+
+Contient les valeurs par défaut pour tous les environnements (Kafka, Druid, Task, Tuning, Granularity).
+
+### 2. Fichier `schema.yml`
+
+Définit le schéma Druid :
+- `dimensions`: Liste des dimensions
+- `metrics`: Liste des métriques
+- `transforms`: Liste des transformations
+- `indexSpec`: Configuration d'indexation
+
+### 3. Fichiers `.env` par environnement
+
+Variables spécifiques à chaque environnement qui surchargent `defaults.yml` :
 
 ```bash
 # config/dev.env
@@ -80,33 +98,35 @@ DATASOURCE="idm_settlement_snapshot_dev"
 PROTO_DESCRIPTOR_PATH="file:///opt/shared/schemas/settlement_transaction.desc"
 ```
 
-### 2. Fichier `defaults.yml`
-
-Contient les valeurs par défaut (voir `config/defaults.yml`).
-
-### 3. Fichier `schema.yml`
-
-Contient la définition du schéma Druid (voir `config/schema.yml`).
-
 ## 🔧 Fonctionnalités
+
+### Séparation des responsabilités
+
+- **`lib/logger.sh`** : Logging centralisé avec couleurs
+- **`lib/validator.sh`** : Validation des entrées
+- **`lib/config.sh`** : Chargement et fusion des configs
+- **`lib/spec-builder.sh`** : Construction de la spec JSON
+- **`lib/http-client.sh`** : Requêtes HTTP avec retry
+- **`lib/prerequisites.sh`** : Vérification des outils
+
+### Templating
+
+- **`templates/supervisor-spec.json.template`** : Template JSON avec variables
+- Génération de spec via `jq` pour manipulation JSON propre
+- Substitution des variables depuis configs externes
+
+### Commandes modulaires
+
+- **`commands/build.sh`** : Génère la spec JSON
+- **`commands/deploy.sh`** : Déploie vers Druid
+- **`commands/status.sh`** : Récupère le statut
 
 ### Gestion d'erreurs
 
 - `set -euo pipefail` : Arrêt sur erreur
 - Validation des paramètres
 - Messages d'erreur clairs
-
-### Logging
-
-- Couleurs pour la lisibilité
-- Niveaux : INFO, WARN, ERROR
-- Sortie sur stderr (compatible scripts)
-
-### Validation
-
-- Vérification des prérequis (`jq`, `yq`, `curl`)
-- Validation de l'environnement
-- Validation des URLs
+- Retry logic pour HTTP
 
 ## 📝 Exemples
 
@@ -135,37 +155,38 @@ Contient la définition du schéma Druid (voir `config/schema.yml`).
 
 | Aspect | Shell | Java |
 |--------|-------|------|
-| **Taille** | ~400 lignes | ~1095 lignes |
-| **Dépendances** | jq, yq, curl | Maven + 8 libs |
-| **Compilation** | Non | Oui |
-| **Démarrage** | Instantané | ~100ms |
-| **Maintenabilité** | Facile (bash) | Facile (Java) |
-| **Tests** | Shellcheck | JUnit |
-| **Portabilité** | Linux/macOS | Toute plateforme |
+| **Structure** | Modulaire (lib/, commands/) | Modulaire (packages) |
+| **Templating** | Template JSON + jq | Construction directe |
+| **Configs** | defaults.yml + .env + schema.yml | defaults.yml + .env + schema.yml |
+| **Lignes** | ~600 (modulaire) | ~1095 |
+| **Dépendances** | jq, curl, yq | Maven + 8 libs |
+| **Maintenabilité** | Excellente (modules) | Excellente (packages) |
 
 ## 🎓 Pour un développeur Java
 
 ### Points familiers
 
-1. **Structure modulaire** : Fonctions = méthodes
-2. **Gestion d'erreurs** : `error_exit()` = exceptions
-3. **Configuration** : `.env` = properties
-4. **Logging** : `log_info()` = logger
+1. **Modules** : `lib/` = packages Java
+2. **Commandes** : `commands/` = classes de commande
+3. **Templates** : `templates/` = templates de configuration
+4. **Configs** : `config/` = fichiers de configuration
+5. **Logging** : `lib/logger.sh` = logger Java
+6. **Validation** : `lib/validator.sh` = validation Java
 
-### Différences clés
+### Architecture similaire
 
-- **Variables** : `$VAR` au lieu de `var`
-- **Fonctions** : `function_name() { ... }` au lieu de méthodes
-- **Conditions** : `[ condition ]` au lieu de `if (condition)`
-- **JSON** : `jq` au lieu de Jackson
+- **Séparation des responsabilités** : Chaque module a une responsabilité unique
+- **Réutilisabilité** : Modules importables (`source`)
+- **Testabilité** : Modules testables indépendamment
+- **Extensibilité** : Facile d'ajouter de nouvelles commandes
 
 ## 🔍 Debugging
 
 ### Mode verbose
 
 ```bash
-# Ajouter -x pour voir les commandes exécutées
-bash -x ./druid-ingestion.sh build -e dev
+# Activer le mode debug
+DEBUG=1 ./druid-ingestion.sh build -e dev
 ```
 
 ### Vérifier la configuration
@@ -173,14 +194,8 @@ bash -x ./druid-ingestion.sh build -e dev
 ```bash
 # Voir les valeurs chargées
 source config/dev.env
-echo $DRUID_URL
+env | grep -E "(KAFKA|DRUID|DATASOURCE)"
 ```
-
-## 📚 Ressources
-
-- [jq Manual](https://stedolan.github.io/jq/manual/)
-- [yq Documentation](https://mikefarah.gitbook.io/yq/)
-- [Bash Best Practices](https://mywiki.wooledge.org/BashGuide)
 
 ## ✅ Checklist pour production
 
@@ -189,4 +204,11 @@ echo $DRUID_URL
 - [ ] Validation des URLs Druid
 - [ ] Tests avec `shellcheck`
 - [ ] Documentation à jour
+- [ ] Template JSON validé
 
+## 📚 Ressources
+
+- [jq Manual](https://stedolan.github.io/jq/manual/)
+- [yq Documentation](https://mikefarah.gitbook.io/yq/)
+- [Bash Best Practices](https://mywiki.wooledge.org/BashGuide)
+- [ShellCheck](https://www.shellcheck.net/)

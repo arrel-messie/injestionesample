@@ -1,0 +1,112 @@
+{
+  "type": "kafka",
+  "spec": {
+    "ioConfig": {
+      "type": "kafka",
+      "consumerProperties": {
+        "bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
+        "security.protocol": "${KAFKA_SECURITY_PROTOCOL}",
+        "sasl.mechanism": "${KAFKA_SASL_MECHANISM}",
+        "sasl.jaas.config": "${KAFKA_SASL_JAAS_CONFIG}",
+        "ssl.endpoint.identification.algorithm": "${KAFKA_SSL_ENDPOINT_ID:-}",
+        "group.id": "druid-${DATASOURCE}-${ENV}",
+        "fetch.min.bytes": ${KAFKA_FETCH_MIN_BYTES:-1048576},
+        "fetch.max.wait.ms": ${KAFKA_FETCH_MAX_WAIT_MS:-500},
+        "max.poll.records": ${KAFKA_MAX_POLL_RECORDS:-500},
+        "session.timeout.ms": ${KAFKA_SESSION_TIMEOUT_MS:-30000},
+        "heartbeat.interval.ms": ${KAFKA_HEARTBEAT_INTERVAL_MS:-3000},
+        "max.poll.interval.ms": ${KAFKA_MAX_POLL_INTERVAL_MS:-300000},
+        "enable.auto.commit": false,
+        "auto.offset.reset": "${KAFKA_AUTO_OFFSET_RESET:-latest}"
+      },
+      "topic": "${KAFKA_TOPIC}",
+      "inputFormat": {
+        "type": "protobuf",
+        "protoBytesDecoder": {
+          "type": "file",
+          "descriptor": "${PROTO_DESCRIPTOR_PATH}",
+          "protoMessageType": "${PROTO_MESSAGE_TYPE}"
+        }
+      },
+      "useEarliestOffset": ${TASK_USE_EARLIEST_OFFSET:-false},
+      "useTransaction": ${TASK_USE_TRANSACTION:-true},
+      "taskCount": ${TASK_COUNT:-10},
+      "replicas": ${TASK_REPLICAS:-2},
+      "taskDuration": "${TASK_DURATION:-PT1H}",
+      "startDelay": "${TASK_START_DELAY:-PT5S}",
+      "period": "${TASK_PERIOD:-PT30S}",
+      "completionTimeout": "${TASK_COMPLETION_TIMEOUT:-PT1H}",
+      "lateMessageRejectionPeriod": "${TASK_LATE_MESSAGE_REJECTION_PERIOD:-PT1H}",
+      "pollTimeout": ${TASK_POLL_TIMEOUT:-100},
+      "minimumMessageTime": "${TASK_MINIMUM_MESSAGE_TIME:-1970-01-01T00:00:00.000Z}"
+    },
+    "tuningConfig": {
+      "type": "kafka",
+      "maxRowsInMemory": ${TUNING_MAX_ROWS_IN_MEMORY:-500000},
+      "maxBytesInMemory": ${TUNING_MAX_BYTES_IN_MEMORY:-536870912},
+      "maxRowsPerSegment": ${TUNING_MAX_ROWS_PER_SEGMENT:-5000000},
+      "maxTotalRows": null,
+      "intermediatePersistPeriod": "PT10M",
+      "maxPendingPersists": ${TUNING_MAX_PENDING_PERSISTS:-2},
+      "reportParseExceptions": ${TUNING_REPORT_PARSE_EXCEPTIONS:-true},
+      "handoffConditionTimeout": ${TUNING_HANDOFF_CONDITION_TIMEOUT:-900000},
+      "resetOffsetAutomatically": ${TUNING_RESET_OFFSET_AUTOMATICALLY:-false},
+      "workerThreads": null,
+      "chatThreads": null,
+      "chatRetries": ${TUNING_CHAT_RETRIES:-8},
+      "httpTimeout": "${TUNING_HTTP_TIMEOUT:-PT10S}",
+      "shutdownTimeout": "${TUNING_SHUTDOWN_TIMEOUT:-PT80S}",
+      "offsetFetchPeriod": "${TUNING_OFFSET_FETCH_PERIOD:-PT30S}",
+      "intermediateHandoffPeriod": "${TUNING_INTERMEDIATE_HANDOFF_PERIOD:-P2147483647D}",
+      "logParseExceptions": ${TUNING_LOG_PARSE_EXCEPTIONS:-true},
+      "maxParseExceptions": ${TUNING_MAX_PARSE_EXCEPTIONS:-10000},
+      "maxSavedParseExceptions": ${TUNING_MAX_SAVED_PARSE_EXCEPTIONS:-100},
+      "skipSequenceNumberAvailabilityCheck": ${TUNING_SKIP_SEQUENCE_NUMBER_AVAILABILITY_CHECK:-false},
+      "partitionsSpec": {
+        "type": "${TUNING_PARTITIONS_SPEC_TYPE:-dynamic}",
+        "partitionDimensions": ${TUNING_SECONDARY_PARTITION_DIMENSIONS:-[]},
+        "targetRowsPerSegment": ${TUNING_TARGET_ROWS_PER_SEGMENT:-5000000}
+      },
+      "splitHintSpec": {
+        "type": "maxSize",
+        "maxSplitSize": ${TUNING_MAX_SPLIT_SIZE:-1073741824},
+        "maxInputSegmentBytesPerTask": ${TUNING_MAX_INPUT_SEGMENT_BYTES_PER_TASK:-10737418240}
+      },
+      "indexSpec": {
+        "bitmap": {
+          "type": "${INDEX_SPEC_BITMAP_TYPE:-roaring}"
+        },
+        "dimensionCompression": "${INDEX_SPEC_DIMENSION_COMPRESSION:-lz4}",
+        "metricCompression": "${INDEX_SPEC_METRIC_COMPRESSION:-lz4}",
+        "longEncoding": "${INDEX_SPEC_LONG_ENCODING:-longs}"
+      },
+      "indexSpecForIntermediatePersists": {
+        "bitmap": {
+          "type": "${INDEX_SPEC_BITMAP_TYPE:-roaring}"
+        },
+        "dimensionCompression": "${INDEX_SPEC_DIMENSION_COMPRESSION:-lz4}",
+        "metricCompression": "${INDEX_SPEC_METRIC_COMPRESSION:-lz4}",
+        "longEncoding": "${INDEX_SPEC_LONG_ENCODING:-longs}"
+      }
+    },
+    "dataSchema": {
+      "dataSource": "${DATASOURCE}",
+      "timestampSpec": {
+        "column": "${DRUID_TIMESTAMP_COLUMN}",
+        "format": "${DRUID_TIMESTAMP_FORMAT}",
+        "missingValue": null
+      },
+      "dimensionsSpec": __DIMENSIONS_SPEC__,
+      "metricsSpec": __METRICS_SPEC__,
+      "transformSpec": __TRANSFORM_SPEC__,
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "${GRANULARITY_SEGMENT}",
+        "queryGranularity": "${GRANULARITY_QUERY}",
+        "rollup": ${GRANULARITY_ROLLUP},
+        "intervals": null
+      }
+    }
+  }
+}
+

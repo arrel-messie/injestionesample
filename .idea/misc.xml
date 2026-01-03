@@ -14,6 +14,7 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/kafka-producer/pom.xml" />
+        <option value="$PROJECT_DIR$/druid-ingestion/pom.xml" />
       </list>
     </option>
   </component>
