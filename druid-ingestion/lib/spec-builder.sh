@@ -1,72 +1,36 @@
 #!/usr/bin/env bash
 #
-# Spec Builder - Optimized with generic functions
+# Spec Builder - Simplified (schema from schema.json, config from .env)
 #
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
-# Generic spec builder
-_build_spec() {
-    local schema_file="$1" jq_expr="$2" default="$3"
-    jq -c "$jq_expr" "$schema_file" 2>/dev/null || echo "$default"
-}
-
-# Build dimensions spec from schema.json
-_build_dimensions_spec() {
-    _build_spec "$1" '{
+# Load schema sections from schema.json
+_load_schema() {
+    local schema_file="$1"
+    
+    # Dimensions spec
+    export DIMENSIONS_SPEC=$(jq -c '{
         dimensions: (.dimensions // []),
         dimensionExclusions: ["settlement_ts", "settlement_entry_ts", "acceptance_ts", "payee_access_manager_id"],
         includeAllDimensions: false,
         useSchemaDiscovery: false
-    }' '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}'
-}
-
-# Build metrics spec from schema.json
-_build_metrics_spec() {
-    _build_spec "$1" '.metrics // []' '[]'
-}
-
-# Build transforms spec from schema.json
-_build_transforms_spec() {
-    _build_spec "$1" '{
+    }' "$schema_file" 2>/dev/null || echo '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}')
+    
+    # Metrics spec
+    export METRICS_SPEC=$(jq -c '.metrics // []' "$schema_file" 2>/dev/null || echo '[]')
+    
+    # Transforms spec
+    export TRANSFORMS_SPEC=$(jq -c '{
         transforms: ((.transforms // []) | map({type: "expression", name: .name, expression: .expression})),
         filter: null
-    }' '{"transforms":[],"filter":null}'
+    }' "$schema_file" 2>/dev/null || echo '{"transforms":[],"filter":null}')
+    
+    # Index spec (from schema.json or use env vars if not present)
+    eval "$(jq -r '.indexSpec | to_entries[] | "export INDEX_SPEC_\(.key | ascii_upcase)=\"\(.value)\""' "$schema_file" 2>/dev/null || echo '')"
 }
 
-# Load index spec from schema.json (consolidated)
-_load_index_spec() {
-    local schema_file="$1"
-    eval "$(jq -r '.indexSpec | to_entries[] | "export INDEX_SPEC_\(.key | ascii_upcase)=\"\(.value)\""' "$schema_file" 2>/dev/null || echo 'export INDEX_SPEC_BITMAP_TYPE="roaring" INDEX_SPEC_DIMENSION_COMPRESSION="lz4" INDEX_SPEC_METRIC_COMPRESSION="lz4" INDEX_SPEC_LONG_ENCODING="longs"')"
-}
-
-# Export template variables from defaults.json
-_export_template_vars() {
-    local defaults_file="${1:-}"
-    [ ! -f "$defaults_file" ] && return
-    
-    # Helper to convert camelCase to UPPER_SNAKE_CASE
-    _to_snake_case() {
-        echo "$1" | sed 's/\([a-z]\)\([A-Z]\)/\1_\2/g' | tr '[:lower:]' '[:upper:]'
-    }
-    
-    # Export kafka.* as KAFKA_*
-    jq -r '.kafka | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "KAFKA_$(_to_snake_case "$key")"="${!key:-$value}"
-    done
-    
-    # Export task.* as TASK_*
-    jq -r '.task | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "TASK_$(_to_snake_case "$key")"="${!key:-$value}"
-    done
-    
-    # Export tuning.* as TUNING_*
-    jq -r '.tuning | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "TUNING_$(_to_snake_case "$key")"="${!key:-$value}"
-    done
-}
-
-# Build spec using template
+# Build spec using template (schema from schema.json, config from .env)
 build_spec() {
     local env="${1:-}" output="${2:-}" config_dir="${3:-}" template_dir="${4:-}"
     
@@ -79,22 +43,17 @@ build_spec() {
     local template_file="${template_dir}/supervisor-spec.json.template"
     [ ! -f "$template_file" ] && log_error "Template not found: $template_file" && return 1
     
-    local defaults_file="${config_dir}/defaults.json"
-    _load_index_spec "$schema_file"
-    _export_template_vars "$defaults_file"
-    
-    local dimensions_spec metrics_spec transforms_spec
-    dimensions_spec=$(_build_dimensions_spec "$schema_file") || return 1
-    metrics_spec=$(_build_metrics_spec "$schema_file") || return 1
-    transforms_spec=$(_build_transforms_spec "$schema_file") || return 1
+    # Load schema sections
+    _load_schema "$schema_file"
     
     [ -z "$output" ] && output="$(dirname "$(dirname "$config_dir")")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json"
     mkdir -p "$(dirname "$output")"
     
+    # Replace schema placeholders with sed, then substitute env vars with envsubst
     local temp_file=$(mktemp)
-    sed -e "s|__DIMENSIONS_SPEC__|$dimensions_spec|g" \
-        -e "s|__METRICS_SPEC__|$metrics_spec|g" \
-        -e "s|__TRANSFORM_SPEC__|$transforms_spec|g" "$template_file" > "$temp_file"
+    sed -e "s|__DIMENSIONS_SPEC__|$DIMENSIONS_SPEC|g" \
+        -e "s|__METRICS_SPEC__|$METRICS_SPEC|g" \
+        -e "s|__TRANSFORM_SPEC__|$TRANSFORMS_SPEC|g" "$template_file" > "$temp_file"
     
     command -v envsubst >/dev/null 2>&1 || { log_error "envsubst is required"; rm -f "$temp_file"; return 1; }
     envsubst < "$temp_file" > "$output"
