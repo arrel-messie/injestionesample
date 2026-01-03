@@ -38,7 +38,7 @@ _validate_env() {
     if [[ -z "$ENV" ]]; then
         error_exit "Environment (-e) is required"
     fi
-    if [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]]; then
+    if [[ ! "$ENV" =~ ^(dev|interim|prod)$ ]]; then
         error_exit "Invalid environment: $ENV"
     fi
 }
@@ -108,7 +108,7 @@ Commands:
   status          Get supervisor status
 
 Options:
-  -e, --env       Environment (dev/staging/prod/test) [required]
+  -e, --env       Environment (dev/interim/prod) [required]
   -o, --output    Output file path
   -f, --file      Input file path
   -v, --verbose   Verbose output
