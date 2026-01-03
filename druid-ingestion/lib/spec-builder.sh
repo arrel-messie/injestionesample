@@ -61,7 +61,8 @@ build_spec() {
     
     _load_schema "$schema"
     
-    output="${output:-$(dirname "$(dirname "$config_dir")")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
+    local script_dir="${SCRIPT_DIR:-$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")")}"
+    output="${output:-${script_dir}/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
     mkdir -p "$(dirname "$output")"
     
     local tmp="${output}.tmp"
