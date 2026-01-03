@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# Config module - Simplified (single source of truth: .env file)
-#
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
@@ -24,6 +21,5 @@ load_config() {
         log_error "Invalid DRUID_URL: ${DRUID_URL}"
         return 1
     }
-    
     export ENV="$env"
 }

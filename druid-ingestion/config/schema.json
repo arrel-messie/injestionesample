@@ -11,6 +11,11 @@
     { "type": "string", "name": "reason_code" },
     { "type": "string", "name": "payment_type_code" }
   ],
+  "dimensionsSpec": {
+    "dimensionExclusions": ["settlement_ts", "settlement_entry_ts", "acceptance_ts", "payee_access_manager_id"],
+    "includeAllDimensions": false,
+    "useSchemaDiscovery": false
+  },
   "metrics": [
     { "type": "count", "name": "count" },
     { "type": "doubleSum", "name": "amount_sum", "fieldName": "amount" }
