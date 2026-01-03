@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 [ -z "${RED:-}" ] && readonly RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[1;33m' NC='\033[0m'
-[ -z "${VERBOSE_READONLY:-}" ] && readonly VERBOSE="${VERBOSE:-0}" && export VERBOSE_READONLY=1
+VERBOSE="${VERBOSE:-0}"
 
 log_info() { [[ "$VERBOSE" -ge 1 ]] && echo -e "${GREEN}[INFO]${NC} $*" >&2 || true; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
