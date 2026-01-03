@@ -1,0 +1,21 @@
+# Generated specs
+druid-specs/generated/
+
+# Compiled protobuf
+schemas/compiled/
+
+# Environment files with secrets
+config/*.env
+!config/*.env.example
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
