@@ -123,27 +123,42 @@ build_spec() {
     temp_file=$(mktemp)
     
     # Replace JSON placeholders first (before envsubst)
+    # These are complex JSON objects that need to be inserted as-is
     sed "s|__DIMENSIONS_SPEC__|$dimensions_spec|g" "$template_file" | \
     sed "s|__METRICS_SPEC__|$metrics_spec|g" | \
     sed "s|__TRANSFORM_SPEC__|$transforms_spec|g" > "$temp_file"
     
-    # Substitute environment variables
+    # Substitute environment variables using envsubst
+    # envsubst handles ${VAR} and ${VAR:-default} syntax
     if command -v envsubst >/dev/null 2>&1; then
+        # Export all variables that might be used in template
+        export KAFKA_BOOTSTRAP_SERVERS KAFKA_SECURITY_PROTOCOL KAFKA_SASL_MECHANISM
+        export KAFKA_SASL_JAAS_CONFIG KAFKA_SSL_ENDPOINT_ID DATASOURCE ENV
+        export KAFKA_TOPIC PROTO_DESCRIPTOR_PATH PROTO_MESSAGE_TYPE
+        export DRUID_TIMESTAMP_COLUMN DRUID_TIMESTAMP_FORMAT
+        export GRANULARITY_SEGMENT GRANULARITY_QUERY GRANULARITY_ROLLUP
+        export KAFKA_FETCH_MIN_BYTES KAFKA_FETCH_MAX_WAIT_MS KAFKA_MAX_POLL_RECORDS
+        export KAFKA_SESSION_TIMEOUT_MS KAFKA_HEARTBEAT_INTERVAL_MS KAFKA_MAX_POLL_INTERVAL_MS
+        export KAFKA_AUTO_OFFSET_RESET
+        export TASK_USE_EARLIEST_OFFSET TASK_USE_TRANSACTION TASK_COUNT TASK_REPLICAS
+        export TASK_DURATION TASK_START_DELAY TASK_PERIOD TASK_COMPLETION_TIMEOUT
+        export TASK_LATE_MESSAGE_REJECTION_PERIOD TASK_POLL_TIMEOUT TASK_MINIMUM_MESSAGE_TIME
+        export TUNING_MAX_ROWS_IN_MEMORY TUNING_MAX_BYTES_IN_MEMORY TUNING_MAX_ROWS_PER_SEGMENT
+        export TUNING_MAX_PENDING_PERSISTS TUNING_REPORT_PARSE_EXCEPTIONS
+        export TUNING_HANDOFF_CONDITION_TIMEOUT TUNING_RESET_OFFSET_AUTOMATICALLY
+        export TUNING_CHAT_RETRIES TUNING_HTTP_TIMEOUT TUNING_SHUTDOWN_TIMEOUT
+        export TUNING_OFFSET_FETCH_PERIOD TUNING_INTERMEDIATE_HANDOFF_PERIOD
+        export TUNING_LOG_PARSE_EXCEPTIONS TUNING_MAX_PARSE_EXCEPTIONS
+        export TUNING_MAX_SAVED_PARSE_EXCEPTIONS TUNING_SKIP_SEQUENCE_NUMBER_AVAILABILITY_CHECK
+        export TUNING_PARTITIONS_SPEC_TYPE TUNING_SECONDARY_PARTITION_DIMENSIONS
+        export TUNING_TARGET_ROWS_PER_SEGMENT TUNING_MAX_SPLIT_SIZE
+        export TUNING_MAX_INPUT_SEGMENT_BYTES_PER_TASK
+        
         envsubst < "$temp_file" > "$output"
     else
-        # Fallback: manual substitution for critical vars
-        sed -e "s|\${KAFKA_BOOTSTRAP_SERVERS}|${KAFKA_BOOTSTRAP_SERVERS}|g" \
-            -e "s|\${DATASOURCE}|${DATASOURCE}|g" \
-            -e "s|\${ENV}|${ENV}|g" \
-            -e "s|\${KAFKA_TOPIC}|${KAFKA_TOPIC}|g" \
-            -e "s|\${PROTO_DESCRIPTOR_PATH}|${PROTO_DESCRIPTOR_PATH}|g" \
-            -e "s|\${PROTO_MESSAGE_TYPE}|${PROTO_MESSAGE_TYPE}|g" \
-            -e "s|\${DRUID_TIMESTAMP_COLUMN}|${DRUID_TIMESTAMP_COLUMN}|g" \
-            -e "s|\${DRUID_TIMESTAMP_FORMAT}|${DRUID_TIMESTAMP_FORMAT}|g" \
-            -e "s|\${GRANULARITY_SEGMENT}|${GRANULARITY_SEGMENT}|g" \
-            -e "s|\${GRANULARITY_QUERY}|${GRANULARITY_QUERY}|g" \
-            -e "s|\${GRANULARITY_ROLLUP}|${GRANULARITY_ROLLUP}|g" \
-            "$temp_file" > "$output"
+        log_error "envsubst is required for template substitution"
+        rm -f "$temp_file"
+        return 1
     fi
     
     rm -f "$temp_file"
