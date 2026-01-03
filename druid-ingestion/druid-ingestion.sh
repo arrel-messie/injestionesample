@@ -39,15 +39,7 @@ check_prerequisites() {
     fi
 }
 
-# Validation
-validate_env() {
-    [[ "$1" =~ ^(dev|staging|prod|test)$ ]] || error_exit "Invalid environment: $1. Must be: dev, staging, prod, or test"
-}
-
-validate_url() {
-    [[ "$1" =~ ^https?:// ]] || error_exit "Invalid URL: $1 (must start with http:// or https://)"
-}
-
+# Validation (moved to config.sh)
 validate_file_exists() {
     [ -z "$1" ] && log_error "File path is required" && return 1
     [ ! -f "$1" ] && log_error "File not found: $1" && return 1
@@ -94,8 +86,6 @@ source "${SCRIPT_DIR}/lib/spec-builder.sh"
 # Commands
 cmd_build() {
     local env="$1" output="${2:-}"
-    log_info "Building supervisor spec for environment: $env"
-    validate_env "$env"
     load_config "$env" "$CONFIG_DIR" || return 1
     build_spec "$env" "$output" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
@@ -104,51 +94,32 @@ cmd_compile_proto() {
     local proto_file="${1:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
     local output="${2:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
     
-    log_info "Compiling protobuf descriptor: $proto_file"
+    command -v protoc >/dev/null 2>&1 || error_exit "protoc not found. Install with: brew install protobuf (macOS) or apt-get install protobuf-compiler (Linux)"
     
-    if ! command -v protoc >/dev/null 2>&1; then
-        error_exit "protoc not found. Install with: brew install protobuf (macOS) or apt-get install protobuf-compiler (Linux)"
-    fi
-    
-    local proto_dir="$(dirname "$proto_file")"
     mkdir -p "$(dirname "$output")"
-    
-    protoc --descriptor_set_out="$output" \
-           --proto_path="$proto_dir" \
-           "$proto_file" || error_exit "Failed to compile protobuf"
-    
-    log_info "✅ Protobuf descriptor compiled: $output"
+    protoc --descriptor_set_out="$output" --proto_path="$(dirname "$proto_file")" "$proto_file" || error_exit "Failed to compile protobuf"
     echo "$output"
 }
 
 cmd_deploy() {
     local env="$1"
-    log_info "Deploying supervisor for environment: $env"
-    validate_env "$env"
     load_config "$env" "$CONFIG_DIR" || return 1
-    validate_url "$DRUID_URL"
     
     local spec_file="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${env}.json"
-    [ ! -f "$spec_file" ] && log_info "Building spec first..." && build_spec "$env" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
+    [ ! -f "$spec_file" ] && build_spec "$env" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
     
-    log_info "Posting spec to: ${DRUID_URL}/druid/indexer/v1/supervisor"
     local response
     response=$(http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec_file") || return 1
-    log_info "Supervisor deployed successfully for datasource: $DATASOURCE"
+    log_info "Supervisor deployed: $DATASOURCE"
     pretty_json "$response"
 }
 
 cmd_status() {
     local env="$1"
-    log_info "Getting supervisor status for environment: $env"
-    validate_env "$env"
     load_config "$env" "$CONFIG_DIR" || return 1
-    validate_url "$DRUID_URL"
     
-    local url="${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status"
-    log_info "Fetching status from: $url"
     local response
-    response=$(http_request "GET" "$url") || return 1
+    response=$(http_request "GET" "${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status") || return 1
     pretty_json "$response"
 }
 

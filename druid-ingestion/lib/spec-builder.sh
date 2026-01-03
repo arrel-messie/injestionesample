@@ -1,34 +1,37 @@
 #!/usr/bin/env bash
 #
-# Spec Builder - Simplified using JSON directly
+# Spec Builder - Optimized with generic functions
 #
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
+# Generic spec builder
+_build_spec() {
+    local schema_file="$1" jq_expr="$2" default="$3"
+    jq -c "$jq_expr" "$schema_file" 2>/dev/null || echo "$default"
+}
+
 # Build dimensions spec from schema.json
 _build_dimensions_spec() {
-    local schema_file="$1"
-    jq -c '{
+    _build_spec "$1" '{
         dimensions: (.dimensions // []),
         dimensionExclusions: ["settlement_ts", "settlement_entry_ts", "acceptance_ts", "payee_access_manager_id"],
         includeAllDimensions: false,
         useSchemaDiscovery: false
-    }' "$schema_file" 2>/dev/null || echo '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}'
+    }' '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}'
 }
 
 # Build metrics spec from schema.json
 _build_metrics_spec() {
-    local schema_file="$1"
-    jq -c '.metrics // []' "$schema_file" 2>/dev/null || echo '[]'
+    _build_spec "$1" '.metrics // []' '[]'
 }
 
 # Build transforms spec from schema.json
 _build_transforms_spec() {
-    local schema_file="$1"
-    jq -c '{
+    _build_spec "$1" '{
         transforms: ((.transforms // []) | map({type: "expression", name: .name, expression: .expression})),
         filter: null
-    }' "$schema_file" 2>/dev/null || echo '{"transforms":[],"filter":null}'
+    }' '{"transforms":[],"filter":null}'
 }
 
 # Load index spec from schema.json
@@ -40,8 +43,21 @@ _load_index_spec() {
     export INDEX_SPEC_LONG_ENCODING="$(jq -r '.indexSpec.longEncoding // "longs"' "$schema_file" 2>/dev/null || echo "longs")"
 }
 
-# Export all template variables
+# Export template variables from defaults.json
 _export_template_vars() {
+    local defaults_file="${1:-}"
+    [ -f "$defaults_file" ] && {
+        # Export all tuning/task defaults from JSON
+        while IFS='=' read -r key value; do
+            [ -n "$key" ] && export "$key"="${!key:-$value}"
+        done < <(jq -r '
+            (.kafka | to_entries[] | "KAFKA_\(.key | ascii_upcase)=\(.value)"),
+            (.task | to_entries[] | "TASK_\(.key | ascii_upcase)=\(.value)"),
+            (.tuning | to_entries[] | "TUNING_\(.key | ascii_upcase)=\(.value)")
+        ' "$defaults_file" 2>/dev/null)
+    }
+    
+    # Set defaults for variables not in JSON
     export KAFKA_FETCH_MIN_BYTES="${KAFKA_FETCH_MIN_BYTES:-1048576}"
     export KAFKA_FETCH_MAX_WAIT_MS="${KAFKA_FETCH_MAX_WAIT_MS:-500}"
     export KAFKA_MAX_POLL_RECORDS="${KAFKA_MAX_POLL_RECORDS:-500}"
@@ -96,8 +112,9 @@ build_spec() {
     local template_file="${template_dir}/supervisor-spec.json.template"
     [ ! -f "$template_file" ] && log_error "Template not found: $template_file" && return 1
     
+    local defaults_file="${config_dir}/defaults.json"
     _load_index_spec "$schema_file"
-    _export_template_vars
+    _export_template_vars "$defaults_file"
     
     local dimensions_spec metrics_spec transforms_spec
     dimensions_spec=$(_build_dimensions_spec "$schema_file") || return 1
@@ -106,8 +123,6 @@ build_spec() {
     
     [ -z "$output" ] && output="$(dirname "$(dirname "$config_dir")")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json"
     mkdir -p "$(dirname "$output")"
-    
-    log_info "Building supervisor spec: $output"
     
     local temp_file=$(mktemp)
     sed "s|__DIMENSIONS_SPEC__|$dimensions_spec|g" "$template_file" | \
@@ -120,7 +135,5 @@ build_spec() {
     
     command -v jq >/dev/null 2>&1 && jq empty "$output" 2>/dev/null || { log_error "Generated spec is not valid JSON"; return 1; }
     
-    log_info "Supervisor spec built successfully: $output"
     echo "$output"
 }
-
