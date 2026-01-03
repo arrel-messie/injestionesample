@@ -120,8 +120,11 @@ EOF
 main() {
     check_prerequisites
     case "${1:-help}" in
-        build|compile-proto|deploy|status)
+        build|deploy|status)
             "cmd_$1" "${@:2}"
+            ;;
+        compile-proto)
+            cmd_compile_proto "${@:2}"
             ;;
         help|--help|-h) usage ;;
         *) error_exit "Unknown: $1. Use '$0 help'" ;;
