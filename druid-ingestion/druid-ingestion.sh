@@ -83,7 +83,7 @@ cmd_deploy() {
     _validate_env
     build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
     
-    local spec="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${ENV}.json"
+    local spec="${SPECS_DIR}/supervisor-spec-${DATASOURCE}.json"
     [[ ! -f "$spec" ]] && error_exit "Spec not found: $spec"
     
     http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec" | jq '.' || cat

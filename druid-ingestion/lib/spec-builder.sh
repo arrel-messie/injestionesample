@@ -4,7 +4,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
 _load_config() {
     local env="$1" config_dir="$2"
-    if [[ ! "$env" =~ ^(dev|staging|prod|test)$ ]]; then
+    if [[ ! "$env" =~ ^(dev|interim|prod)$ ]]; then
         log_error "Invalid environment: $env"
         return 1
     fi
@@ -62,7 +62,7 @@ build_spec() {
     _load_schema "$schema"
     
     local script_dir="${SCRIPT_DIR:-$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")")}"
-    output="${output:-${script_dir}/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
+    output="${output:-${script_dir}/druid-specs/generated/supervisor-spec-${DATASOURCE}.json}"
     mkdir -p "$(dirname "$output")"
     
     local tmp="${output}.tmp"
