@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package com.company;
+
+import "google/protobuf/timestamp.proto";
+
+message PaymentTransactionEvent {
+  string uetr = 1;
+  string rtgs_business_date = 2;
+  string tx_type = 3;
+  string status = 4;
+  double amount = 5;
+  string currency = 6;
+  string payer_access_manager_bic = 7;
+  string payer_access_manager_id = 8;
+  string payee_access_manager_bic = 9;
+  string payee_access_manager_id = 10;
+  string reason_code = 11;
+  string payment_type_code = 12;
+  google.protobuf.Timestamp settlement_ts = 13;
+  google.protobuf.Timestamp settlement_entry_ts = 14;
+  google.protobuf.Timestamp acceptance_ts = 15;
+  int64 settlement_timestamp_ms = 16;
+}
