@@ -7,7 +7,6 @@ TEMPLATE_DIR="${SCRIPT_DIR}/templates"
 SPECS_DIR="${SCRIPT_DIR}/druid-specs/generated"
 
 source "${SCRIPT_DIR}/lib/logger.sh"
-source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/spec-builder.sh"
 
 check_prerequisites() {
@@ -49,16 +48,10 @@ http_request() {
     log_error "Unexpected HTTP code: $code" && return 1
 }
 
-with_env() {
-    local env="${1:?Environment (-e) required}"
-    load_config "$env" "$CONFIG_DIR"
-}
-
 cmd_build() {
     parse_opts "$@"
     [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
     [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
-    with_env "$ENV"
     build_spec "$ENV" "$OUTPUT" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
 
@@ -80,13 +73,10 @@ cmd_deploy() {
     parse_opts "$@"
     [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
     [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
-    with_env "$ENV"
     
-    [[ -z "${DATASOURCE:-}" ]] && error_exit "DATASOURCE not set in config"
-    [[ -z "${DRUID_URL:-}" ]] && error_exit "DRUID_URL not set in config"
-
+    build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
+    
     local spec="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${ENV}.json"
-    [[ ! -f "$spec" ]] && build_spec "$ENV" "$spec" "$CONFIG_DIR" "$TEMPLATE_DIR"
     [[ ! -f "$spec" ]] && error_exit "Spec file not found: $spec"
 
     http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec" | jq '.' || cat
@@ -97,10 +87,8 @@ cmd_status() {
     parse_opts "$@"
     [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
     [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
-    with_env "$ENV"
     
-    [[ -z "${DATASOURCE:-}" ]] && error_exit "DATASOURCE not set in config"
-    [[ -z "${DRUID_URL:-}" ]] && error_exit "DRUID_URL not set in config"
+    build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
     
     http_request "GET" "${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status" | jq '.' || cat
 }
