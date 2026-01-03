@@ -112,7 +112,7 @@ deploy:staging:
     - |
       if [ -n "${S3_BUCKET_STAGING}" ]; then
         echo "📤 Uploading descriptor to S3: s3://${S3_BUCKET_STAGING}/schemas/settlement_transaction.desc"
-        aws s3 cp "${PROTO_DESC_OUTPUT}" "s3://${S3_BUCKET_STAGING}/schemas/schemas/settlement_transaction.desc" \
+        aws s3 cp "${PROTO_DESC_OUTPUT}" "s3://${S3_BUCKET_STAGING}/schemas/settlement_transaction.desc" \
           --region "${S3_REGION_STAGING:-us-east-1}" || exit 1
         echo "✅ Descriptor uploaded successfully"
       fi
