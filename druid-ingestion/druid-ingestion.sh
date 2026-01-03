@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# Druid Ingestion Manager - Optimized
-#
 
 set -euo pipefail
 
@@ -10,10 +7,8 @@ CONFIG_DIR="${SCRIPT_DIR}/config"
 TEMPLATE_DIR="${SCRIPT_DIR}/templates"
 SPECS_DIR="${SCRIPT_DIR}/druid-specs/generated"
 
-# Load logger first
 source "${SCRIPT_DIR}/lib/logger.sh"
 
-# Prerequisites
 check_prerequisites() {
     local missing=()
     command -v jq >/dev/null 2>&1 || missing+=("jq")
@@ -21,7 +16,6 @@ check_prerequisites() {
     [ ${#missing[@]} -gt 0 ] && error_exit "Missing: ${missing[*]}. Install: brew install jq curl"
 }
 
-# Parse options (generic, returns via global variables)
 parse_opts() {
     PARSED_ENV="" PARSED_OUTPUT="" PARSED_FILE=""
     while [[ $# -gt 0 ]]; do
@@ -34,7 +28,6 @@ parse_opts() {
     done
 }
 
-# HTTP client (simplified)
 http_request() {
     local method="$1" url="$2" data_file="${3:-}" attempt=0 max_retries="${4:-3}"
     local curl_opts=(-s -w "\n%{http_code}" -X "$method")
@@ -53,11 +46,9 @@ http_request() {
 
 pretty_json() { echo "${1:-}" | jq '.' 2>/dev/null || echo "${1:-}"; }
 
-# Load modules
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/spec-builder.sh"
 
-# Wrapper for commands requiring environment
 with_env() {
     local cmd="$1" env="${2:-}"
     [ -z "$env" ] && error_exit "Environment (-e) is required"
@@ -66,7 +57,6 @@ with_env() {
     "$cmd" "$env" "$@"
 }
 
-# Commands
 cmd_build() {
     parse_opts "$@"
     with_env _build_impl "$PARSED_ENV" "$PARSED_OUTPUT" || return 1
@@ -141,7 +131,6 @@ Examples:
 EOF
 }
 
-# Main
 main() {
     check_prerequisites
     local cmd="${1:-help}"

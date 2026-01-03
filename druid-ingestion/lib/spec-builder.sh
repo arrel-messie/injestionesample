@@ -3,7 +3,6 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
 
-# Charge et exporte les sections du schema en variables JSON
 _load_schema() {
     local schema="$1"
 
@@ -21,14 +20,12 @@ _load_schema() {
         filter: null
     }' "$schema")
 
-    # Exporte indexSpec en variables INDEX_SPEC_* (ex: INDEX_SPEC_BITMAP)
     eval "$(jq -r '.indexSpec // {} | to_entries[] |
         "export INDEX_SPEC_\(.key | ascii_upcase)=\(.value | @sh)"' "$schema")"
 
     export DIMENSIONS_SPEC METRICS_SPEC TRANSFORMS_SPEC
 }
 
-# Génère la spec Druid complète
 build_spec() {
     local env="${1:?Environment required}"
     local output="${2:-}"
@@ -45,19 +42,16 @@ build_spec() {
 
     _load_schema "$schema"
 
-    # Détermine le chemin de sortie par défaut
     output="${output:-$(dirname "$(dirname "$config_dir)")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
     mkdir -p "$(dirname "$output")"
 
-    # Remplace placeholders schema puis variables d'environnement
     sed -e "s|__DIMENSIONS_SPEC__|${DIMENSIONS_SPEC}|g" \
         -e "s|__METRICS_SPEC__|${METRICS_SPEC}|g" \
         -e "s|__TRANSFORM_SPEC__|${TRANSFORMS_SPEC}|g" "$template" \
         | envsubst > "$output"
 
-    # Valide le JSON généré
     jq empty "$output" || { log_error "Invalid JSON in $output"; return 1; }
 
-    log_info "✓ Generated: $output"
+    log_info "Generated: $output"
     echo "$output"
 }
