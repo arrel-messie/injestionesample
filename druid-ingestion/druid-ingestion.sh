@@ -14,7 +14,9 @@ check_prerequisites() {
     for cmd in jq curl; do
         command -v "$cmd" >/dev/null || missing+=("$cmd")
     done
-    [ ${#missing[@]} -gt 0 ] && error_exit "Missing: ${missing[*]}. Install: brew install ${missing[*]}"
+    if [ ${#missing[@]} -gt 0 ]; then
+        error_exit "Missing: ${missing[*]}. Install: brew install ${missing[*]}"
+    fi
 }
 
 parse_opts() {
