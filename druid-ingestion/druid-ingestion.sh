@@ -79,13 +79,9 @@ cmd_compile_proto() {
 
 cmd_deploy() {
     parse_opts "$@"
-    with_env _deploy_impl "$PARSED_ENV" || return 1
-}
-
-_deploy_impl() {
-    local env="$1"
-    local spec_file="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${env}.json"
-    [ ! -f "$spec_file" ] && build_spec "$env" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
+    with_env "$PARSED_ENV" || return 1
+    local spec_file="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${PARSED_ENV}.json"
+    [ ! -f "$spec_file" ] && build_spec "$PARSED_ENV" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
     local response
     response=$(http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec_file") || return 1
     log_info "Deployed: $DATASOURCE"
@@ -94,11 +90,7 @@ _deploy_impl() {
 
 cmd_status() {
     parse_opts "$@"
-    with_env _status_impl "$PARSED_ENV" || return 1
-}
-
-_status_impl() {
-    local env="$1"
+    with_env "$PARSED_ENV" || return 1
     local response
     response=$(http_request "GET" "${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status") || return 1
     pretty_json "$response"
@@ -107,8 +99,6 @@ _status_impl() {
 # Usage
 usage() {
     cat << EOF
-Druid Ingestion Manager
-
 Usage: $0 <command> [options]
 
 Commands:
@@ -124,7 +114,6 @@ Options:
 
 Examples:
     $0 build -e dev
-    $0 build -e dev -o /tmp/spec.json
     $0 compile-proto
     $0 deploy -e dev
     $0 status -e dev
