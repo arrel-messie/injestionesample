@@ -86,7 +86,8 @@ cmd_deploy() {
     local spec="${SPECS_DIR}/supervisor-spec-${DATASOURCE}.json"
     [[ ! -f "$spec" ]] && error_exit "Spec not found: $spec"
     
-    http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec" | jq '.' || cat
+    local overlord_url="${DRUID_URL/http:\/\/localhost:8888/http://localhost:8081}"
+    http_request "POST" "${overlord_url}/druid/indexer/v1/supervisor" "$spec" | jq '.' || cat
     log_info "Deployed: $DATASOURCE"
 }
 
@@ -94,7 +95,8 @@ cmd_status() {
     parse_opts "$@"
     _validate_env
     build_spec "$ENV" "" "$CONFIG_DIR" "$TEMPLATE_DIR" >/dev/null || return 1
-    http_request "GET" "${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status" | jq '.' || cat
+    local overlord_url="${DRUID_URL/http:\/\/localhost:8888/http://localhost:8081}"
+    http_request "GET" "${overlord_url}/druid/indexer/v1/supervisor/${DATASOURCE}/status" | jq '.' || cat
 }
 
 usage() {
