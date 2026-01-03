@@ -33,18 +33,12 @@ parse_opts() {
 }
 
 http_request() {
-    local method="$1" url="$2" data_file="${3:-}" attempt=0 max=3
-    local opts=(-s -w "\n%{http_code}" -X "$method")
-    [[ -n "$data_file" && -f "$data_file" ]] && opts+=(-H "Content-Type: application/json" -d @"$data_file") || opts+=(-H "Accept: application/json")
-
-    while [ $((++attempt)) -le $max ]; do
-        local response=$(curl "${opts[@]}" "$url" 2>&1) || { [ $attempt -lt $max ] && sleep $((attempt * 2)) && continue || return 1; }
-        local code=$(echo "$response" | tail -n1) body=$(echo "$response" | sed '$d')
-        [[ "$code" =~ ^2[0-9]{2}$ ]] && echo "$body" && return 0
-        [[ "$code" =~ ^4[0-9]{2}$ ]] && log_error "HTTP $code: $body" && return 1
-        [ $attempt -lt $max ] && sleep $((attempt * 2))
-    done
-    error_exit "HTTP failed after $max attempts"
+    local method="$1" url="$2" data_file="${3:-}"
+    if [[ -n "$data_file" && -f "$data_file" ]]; then
+        curl -s -X "$method" -H "Content-Type: application/json" -d @"$data_file" "$url"
+    else
+        curl -s -X "$method" -H "Accept: application/json" "$url"
+    fi
 }
 
 # Charge l'env et valide
