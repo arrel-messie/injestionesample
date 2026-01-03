@@ -45,19 +45,24 @@ _export_template_vars() {
     local defaults_file="${1:-}"
     [ ! -f "$defaults_file" ] && return
     
+    # Helper to convert camelCase to UPPER_SNAKE_CASE
+    _to_snake_case() {
+        echo "$1" | sed 's/\([a-z]\)\([A-Z]\)/\1_\2/g' | tr '[:lower:]' '[:upper:]'
+    }
+    
     # Export kafka.* as KAFKA_*
-    jq -r '.kafka | to_entries[] | "export KAFKA_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "$key"="${!key:-$value}"
+    jq -r '.kafka | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "KAFKA_$(_to_snake_case "$key")"="${!key:-$value}"
     done
     
     # Export task.* as TASK_*
-    jq -r '.task | to_entries[] | "export TASK_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "$key"="${!key:-$value}"
+    jq -r '.task | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "TASK_$(_to_snake_case "$key")"="${!key:-$value}"
     done
     
     # Export tuning.* as TUNING_*
-    jq -r '.tuning | to_entries[] | "export TUNING_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
-        [ -n "$key" ] && export "$key"="${!key:-$value}"
+    jq -r '.tuning | to_entries[] | "\(.key)=\(.value)"' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "TUNING_$(_to_snake_case "$key")"="${!key:-$value}"
     done
 }
 
