@@ -35,8 +35,12 @@ parse_opts() {
 }
 
 _validate_env() {
-    [[ -z "$ENV" ]] && error_exit "Environment (-e) is required"
-    [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]] && error_exit "Invalid environment: $ENV"
+    if [[ -z "$ENV" ]]; then
+        error_exit "Environment (-e) is required"
+    fi
+    if [[ ! "$ENV" =~ ^(dev|staging|prod|test)$ ]]; then
+        error_exit "Invalid environment: $ENV"
+    fi
 }
 
 http_request() {
