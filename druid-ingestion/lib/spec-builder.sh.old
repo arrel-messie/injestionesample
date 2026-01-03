@@ -1,47 +1,52 @@
 #!/usr/bin/env bash
 #
-# Spec Builder - Simplified using JSON directly
+# Spec Builder - Optimized version using template
 #
 
 source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/yaml-helper.sh"
 
-# Build dimensions spec from schema.json
+# Build dimensions spec from schema.yml
 _build_dimensions_spec() {
     local schema_file="$1"
-    jq -c '{
+    local json=$(yaml_to_json "$schema_file")
+    echo "$json" | jq -c '{
         dimensions: (.dimensions // []),
         dimensionExclusions: ["settlement_ts", "settlement_entry_ts", "acceptance_ts", "payee_access_manager_id"],
         includeAllDimensions: false,
         useSchemaDiscovery: false
-    }' "$schema_file" 2>/dev/null || echo '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}'
+    }' 2>/dev/null || echo '{"dimensions":[],"dimensionExclusions":[],"includeAllDimensions":false,"useSchemaDiscovery":false}'
 }
 
-# Build metrics spec from schema.json
+# Build metrics spec from schema.yml
 _build_metrics_spec() {
     local schema_file="$1"
-    jq -c '.metrics // []' "$schema_file" 2>/dev/null || echo '[]'
+    local json=$(yaml_to_json "$schema_file")
+    echo "$json" | jq -c '.metrics // []' 2>/dev/null || echo '[]'
 }
 
-# Build transforms spec from schema.json
+# Build transforms spec from schema.yml
 _build_transforms_spec() {
     local schema_file="$1"
-    jq -c '{
+    local json=$(yaml_to_json "$schema_file")
+    echo "$json" | jq -c '{
         transforms: ((.transforms // []) | map({type: "expression", name: .name, expression: .expression})),
         filter: null
-    }' "$schema_file" 2>/dev/null || echo '{"transforms":[],"filter":null}'
+    }' 2>/dev/null || echo '{"transforms":[],"filter":null}'
 }
 
-# Load index spec from schema.json
+# Load index spec from schema.yml
 _load_index_spec() {
     local schema_file="$1"
-    export INDEX_SPEC_BITMAP_TYPE="$(jq -r '.indexSpec.bitmapType // "roaring"' "$schema_file" 2>/dev/null || echo "roaring")"
-    export INDEX_SPEC_DIMENSION_COMPRESSION="$(jq -r '.indexSpec.dimensionCompression // "lz4"' "$schema_file" 2>/dev/null || echo "lz4")"
-    export INDEX_SPEC_METRIC_COMPRESSION="$(jq -r '.indexSpec.metricCompression // "lz4"' "$schema_file" 2>/dev/null || echo "lz4")"
-    export INDEX_SPEC_LONG_ENCODING="$(jq -r '.indexSpec.longEncoding // "longs"' "$schema_file" 2>/dev/null || echo "longs")"
+    yaml_export "$schema_file" ".indexSpec.bitmapType" "INDEX_SPEC_BITMAP_TYPE" "roaring"
+    yaml_export "$schema_file" ".indexSpec.dimensionCompression" "INDEX_SPEC_DIMENSION_COMPRESSION" "lz4"
+    yaml_export "$schema_file" ".indexSpec.metricCompression" "INDEX_SPEC_METRIC_COMPRESSION" "lz4"
+    yaml_export "$schema_file" ".indexSpec.longEncoding" "INDEX_SPEC_LONG_ENCODING" "longs"
 }
 
-# Export all template variables
+# Export all template variables at once
 _export_template_vars() {
+    # Variables are already exported by load_config, just ensure they exist
     export KAFKA_FETCH_MIN_BYTES="${KAFKA_FETCH_MIN_BYTES:-1048576}"
     export KAFKA_FETCH_MAX_WAIT_MS="${KAFKA_FETCH_MAX_WAIT_MS:-500}"
     export KAFKA_MAX_POLL_RECORDS="${KAFKA_MAX_POLL_RECORDS:-500}"
@@ -90,7 +95,7 @@ build_spec() {
     [ -z "$env" ] && log_error "Environment is required" && return 1
     export ENV="$env"
     
-    local schema_file="${config_dir}/schema.json"
+    local schema_file="${config_dir}/schema.yml"
     [ ! -f "$schema_file" ] && log_error "Schema not found: $schema_file" && return 1
     
     local template_file="${template_dir}/supervisor-spec.json.template"
