@@ -16,7 +16,12 @@ load_config() {
     source "$env_file"
     set +a
     
-    [ -n "${DRUID_URL:-}" ] && [[ ! "${DRUID_URL}" =~ ^https?:// ]] && {
+    local required_vars=("DRUID_URL" "DATASOURCE" "KAFKA_BOOTSTRAP_SERVERS" "KAFKA_TOPIC")
+    for var in "${required_vars[@]}"; do
+        [[ -z "${!var:-}" ]] && log_error "Required variable not set: $var" && return 1
+    done
+    
+    [[ ! "${DRUID_URL}" =~ ^https?:// ]] && {
         log_error "Invalid DRUID_URL: ${DRUID_URL}"
         return 1
     }

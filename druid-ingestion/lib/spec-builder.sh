@@ -42,15 +42,18 @@ build_spec() {
 
     _load_schema "$schema"
 
-    output="${output:-$(dirname "$(dirname "$config_dir)")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
+    output="${output:-$(dirname "$(dirname "$config_dir")")/druid-specs/generated/supervisor-spec-${DATASOURCE}-${env}.json}"
     mkdir -p "$(dirname "$output")"
 
     sed -e "s|__DIMENSIONS_SPEC__|${DIMENSIONS_SPEC}|g" \
         -e "s|__METRICS_SPEC__|${METRICS_SPEC}|g" \
         -e "s|__TRANSFORM_SPEC__|${TRANSFORMS_SPEC}|g" "$template" \
-        | envsubst > "$output"
+        | envsubst > "$output" || { log_error "Failed to generate spec"; return 1; }
 
-    jq empty "$output" || { log_error "Invalid JSON in $output"; return 1; }
+    jq empty "$output" 2>/dev/null || { log_error "Invalid JSON in $output"; return 1; }
+    
+    [[ -z "${DATASOURCE:-}" ]] && { log_error "DATASOURCE not set"; return 1; }
+    [[ -z "${DRUID_URL:-}" ]] && { log_error "DRUID_URL not set"; return 1; }
 
     log_info "Generated: $output"
     echo "$output"
