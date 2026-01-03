@@ -8,7 +8,7 @@
         "security.protocol": "${KAFKA_SECURITY_PROTOCOL}",
         "sasl.mechanism": "${KAFKA_SASL_MECHANISM}",
         "sasl.jaas.config": "${KAFKA_SASL_JAAS_CONFIG}",
-        "ssl.endpoint.identification.algorithm": "${KAFKA_SSL_ENDPOINT_ID}",
+        "ssl.endpoint.identification.algorithm": "${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM}",
         "group.id": "druid-${DATASOURCE}-${ENV}",
         "fetch.min.bytes": ${KAFKA_FETCH_MIN_BYTES},
         "fetch.max.wait.ms": ${KAFKA_FETCH_MAX_WAIT_MS},
@@ -92,8 +92,8 @@
     "dataSchema": {
       "dataSource": "${DATASOURCE}",
       "timestampSpec": {
-        "column": "${DRUID_TIMESTAMP_COLUMN}",
-        "format": "${DRUID_TIMESTAMP_FORMAT}",
+        "column": "${TIMESTAMP_COLUMN}",
+        "format": "${TIMESTAMP_FORMAT}",
         "missingValue": null
       },
       "dimensionsSpec": __DIMENSIONS_SPEC__,
