@@ -29,10 +29,11 @@ Les configurations sont dans `config/` :
 druid-ingestion/
 ├── druid-ingestion.sh      # Script principal
 ├── lib/                    # Modules
-│   ├── config.sh          # Chargement config
 │   ├── logger.sh           # Logging
 │   └── spec-builder.sh     # Génération spec
-├── templates/              # Templates JSON
+├── druid-specs/            # Specs et templates
+│   ├── templates/          # Templates JSON
+│   └── generated/          # Specs générées
 ├── config/                 # Configurations
 └── docs/                   # Documentation
 ```
