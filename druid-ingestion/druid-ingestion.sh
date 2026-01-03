@@ -63,23 +63,12 @@ cmd_compile_proto() {
     local proto_file="${FILE:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
     local output_file="${OUTPUT:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
     
-    if [[ ! -f "$proto_file" ]]; then
-        error_exit "Proto file not found: $proto_file"
-    fi
-    
-    if ! command -v protoc >/dev/null; then
-        error_exit "protoc not found. Install: brew install protobuf"
-    fi
+    [[ ! -f "$proto_file" ]] && error_exit "Proto file not found: $proto_file"
+    command -v protoc >/dev/null || error_exit "protoc not found. Install: brew install protobuf"
     
     mkdir -p "$(dirname "$output_file")"
-    if ! protoc --descriptor_set_out="$output_file" --proto_path="$(dirname "$proto_file")" "$proto_file"; then
-        error_exit "Compilation failed"
-    fi
-    
-    if [[ ! -f "$output_file" ]]; then
-        error_exit "Output not created: $output_file"
-    fi
-    
+    protoc --descriptor_set_out="$output_file" --proto_path="$(dirname "$proto_file")" "$proto_file"
+    [[ -f "$output_file" ]] || error_exit "Output not created: $output_file"
     echo "$output_file"
 }
 
