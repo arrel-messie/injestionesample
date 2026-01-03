@@ -69,6 +69,7 @@ cmd_compile_proto() {
     mkdir -p "$(dirname "$OUTPUT")"
     protoc --descriptor_set_out="$OUTPUT" --proto_path="$(dirname "$FILE")" "$FILE" || error_exit "Compilation failed"
     [[ -f "$OUTPUT" ]] || error_exit "Output not created: $OUTPUT"
+    log_info "Compiled: $OUTPUT"
     echo "$OUTPUT"
 }
 
