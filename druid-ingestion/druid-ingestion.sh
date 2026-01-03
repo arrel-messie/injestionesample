@@ -48,6 +48,12 @@ validate_url() {
     [[ "$1" =~ ^https?:// ]] || error_exit "Invalid URL: $1 (must start with http:// or https://)"
 }
 
+validate_file_exists() {
+    [ -z "$1" ] && log_error "File path is required" && return 1
+    [ ! -f "$1" ] && log_error "File not found: $1" && return 1
+    return 0
+}
+
 # Load config
 source "${SCRIPT_DIR}/lib/config.sh"
 
