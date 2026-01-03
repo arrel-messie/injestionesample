@@ -50,21 +50,15 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/spec-builder.sh"
 
 with_env() {
-    local cmd="$1" env="${2:-}"
+    local env="${1:-}"
     [ -z "$env" ] && error_exit "Environment (-e) is required"
     load_config "$env" "$CONFIG_DIR" || return 1
-    shift 2
-    "$cmd" "$env" "$@"
 }
 
 cmd_build() {
     parse_opts "$@"
-    with_env _build_impl "$PARSED_ENV" "$PARSED_OUTPUT" || return 1
-}
-
-_build_impl() {
-    local env="$1" output="${2:-}"
-    build_spec "$env" "$output" "$CONFIG_DIR" "$TEMPLATE_DIR"
+    with_env "$PARSED_ENV" || return 1
+    build_spec "$PARSED_ENV" "$PARSED_OUTPUT" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
 
 cmd_compile_proto() {
