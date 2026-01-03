@@ -10,7 +10,6 @@ source "${SCRIPT_DIR}/lib/logger.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/spec-builder.sh"
 
-# Vérifie les dépendances
 check_prerequisites() {
     local missing=()
     for cmd in jq curl; do
@@ -50,13 +49,10 @@ http_request() {
     log_error "Unexpected HTTP code: $code" && return 1
 }
 
-# Charge l'env et valide
 with_env() {
     local env="${1:?Environment (-e) required}"
     load_config "$env" "$CONFIG_DIR"
 }
-
-# === Commandes ===
 
 cmd_build() {
     parse_opts "$@"
