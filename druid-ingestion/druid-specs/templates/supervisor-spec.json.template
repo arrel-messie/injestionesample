@@ -61,7 +61,7 @@
       "logParseExceptions": ${LOG_PARSE_EXCEPTIONS},
       "maxParseExceptions": ${MAX_PARSE_EXCEPTIONS},
       "maxSavedParseExceptions": ${MAX_SAVED_PARSE_EXCEPTIONS},
-      "skipSequenceNumberAvailabilityCheck": ${SKIP_SEQUENCE_NUMBER_AVAILABILITY_CHECK:-false},
+      "skipSequenceNumberAvailabilityCheck": false,
       "partitionsSpec": {
         "type": "${PARTITIONS_SPEC_TYPE}",
         "partitionDimensions": ${SECONDARY_PARTITION_DIMENSIONS},
