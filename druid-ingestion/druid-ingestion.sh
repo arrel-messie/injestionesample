@@ -25,41 +25,29 @@ check_prerequisites() {
     [ ${#missing[@]} -gt 0 ] && error_exit "Missing: ${missing[*]}. Install: brew install jq curl"
 }
 
-# Parse options (generic)
+# Parse options (generic, returns via global variables)
 parse_opts() {
-    local env="" output="" file=""
+    PARSED_ENV="" PARSED_OUTPUT="" PARSED_FILE=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -e|--env) env="$2"; shift 2 ;;
-            -o|--output) output="$2"; shift 2 ;;
-            -f|--file) file="$2"; shift 2 ;;
+            -e|--env) PARSED_ENV="$2"; shift 2 ;;
+            -o|--output) PARSED_OUTPUT="$2"; shift 2 ;;
+            -f|--file) PARSED_FILE="$2"; shift 2 ;;
             *) shift ;;
         esac
     done
-    [ -n "$env" ] && echo "$env"
-    [ -n "$output" ] && echo "$output"
-    [ -n "$file" ] && echo "$file"
 }
 
 # HTTP client (simplified)
 http_request() {
     local method="$1" url="$2" data_file="${3:-}" attempt=0 max_retries="${4:-3}"
-    local http_code response
+    local curl_opts=(-s -w "\n%{http_code}" -X "$method")
+    [ -n "$data_file" ] && [ -f "$data_file" ] && curl_opts+=(-H "Content-Type: application/json" -d @"$data_file") || curl_opts+=(-H "Accept: application/json")
     
     while [ $attempt -lt $max_retries ]; do
-        if [ -n "$data_file" ] && [ -f "$data_file" ]; then
-            response=$(curl -s -w "\n%{http_code}" -X "$method" -H "Content-Type: application/json" -d @"$data_file" "$url" 2>&1) || {
-                [ $((++attempt)) -lt $max_retries ] && sleep $((attempt * 2)) && continue || return 1
-            }
-        else
-            response=$(curl -s -w "\n%{http_code}" -X "$method" -H "Accept: application/json" "$url" 2>&1) || {
-                [ $((++attempt)) -lt $max_retries ] && sleep $((attempt * 2)) && continue || return 1
-            }
-        fi
-        
-        http_code=$(echo "$response" | tail -n1)
-        response_body=$(echo "$response" | sed '$d')
-        
+        local response=$(curl "${curl_opts[@]}" "$url" 2>&1) || { [ $((++attempt)) -lt $max_retries ] && sleep $((attempt * 2)) && continue || return 1; }
+        local http_code=$(echo "$response" | tail -n1)
+        local response_body=$(echo "$response" | sed '$d')
         [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ] && echo "$response_body" && return 0
         [ "$http_code" -ge 400 ] && [ "$http_code" -lt 500 ] && log_error "HTTP $http_code: $response_body" && return 1
         [ $((++attempt)) -lt $max_retries ] && sleep $((attempt * 2))
@@ -73,18 +61,30 @@ pretty_json() { echo "${1:-}" | jq '.' 2>/dev/null || echo "${1:-}"; }
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/spec-builder.sh"
 
+# Wrapper for commands requiring environment
+with_env() {
+    local cmd="$1" env="${2:-}"
+    [ -z "$env" ] && error_exit "Environment (-e) is required"
+    load_config "$env" "$CONFIG_DIR" || return 1
+    shift 2
+    "$cmd" "$env" "$@"
+}
+
 # Commands
 cmd_build() {
-    local opts=($(parse_opts "$@"))
-    [ -z "${opts[0]:-}" ] && error_exit "Environment (-e) is required"
-    load_config "${opts[0]}" "$CONFIG_DIR" || return 1
-    build_spec "${opts[0]}" "${opts[1]:-}" "$CONFIG_DIR" "$TEMPLATE_DIR"
+    parse_opts "$@"
+    with_env _build_impl "$PARSED_ENV" "$PARSED_OUTPUT" || return 1
+}
+
+_build_impl() {
+    local env="$1" output="${2:-}"
+    build_spec "$env" "$output" "$CONFIG_DIR" "$TEMPLATE_DIR"
 }
 
 cmd_compile_proto() {
-    local opts=($(parse_opts "$@"))
-    local proto_file="${opts[2]:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
-    local output="${opts[1]:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
+    parse_opts "$@"
+    local proto_file="${PARSED_FILE:-${SCRIPT_DIR}/schemas/proto/settlement_transaction.proto}"
+    local output="${PARSED_OUTPUT:-${SCRIPT_DIR}/schemas/compiled/settlement_transaction.desc}"
     command -v protoc >/dev/null 2>&1 || error_exit "protoc not found. Install: brew install protobuf"
     mkdir -p "$(dirname "$output")"
     protoc --descriptor_set_out="$output" --proto_path="$(dirname "$proto_file")" "$proto_file" || error_exit "Failed to compile"
@@ -92,11 +92,14 @@ cmd_compile_proto() {
 }
 
 cmd_deploy() {
-    local opts=($(parse_opts "$@"))
-    [ -z "${opts[0]:-}" ] && error_exit "Environment (-e) is required"
-    load_config "${opts[0]}" "$CONFIG_DIR" || return 1
-    local spec_file="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${opts[0]}.json"
-    [ ! -f "$spec_file" ] && build_spec "${opts[0]}" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
+    parse_opts "$@"
+    with_env _deploy_impl "$PARSED_ENV" || return 1
+}
+
+_deploy_impl() {
+    local env="$1"
+    local spec_file="${SPECS_DIR}/supervisor-spec-${DATASOURCE}-${env}.json"
+    [ ! -f "$spec_file" ] && build_spec "$env" "$spec_file" "$CONFIG_DIR" "$TEMPLATE_DIR"
     local response
     response=$(http_request "POST" "${DRUID_URL}/druid/indexer/v1/supervisor" "$spec_file") || return 1
     log_info "Deployed: $DATASOURCE"
@@ -104,9 +107,12 @@ cmd_deploy() {
 }
 
 cmd_status() {
-    local opts=($(parse_opts "$@"))
-    [ -z "${opts[0]:-}" ] && error_exit "Environment (-e) is required"
-    load_config "${opts[0]}" "$CONFIG_DIR" || return 1
+    parse_opts "$@"
+    with_env _status_impl "$PARSED_ENV" || return 1
+}
+
+_status_impl() {
+    local env="$1"
     local response
     response=$(http_request "GET" "${DRUID_URL}/druid/indexer/v1/supervisor/${DATASOURCE}/status") || return 1
     pretty_json "$response"
@@ -127,8 +133,8 @@ Commands:
 
 Options:
     -e, --env       Environment (dev, staging, prod) [required]
-    -o, --output    Output file path (build command)
-    -f, --file      Input file path (compile-proto)
+    -o, --output    Output file path
+    -f, --file      Input file path
 
 Examples:
     $0 build -e dev

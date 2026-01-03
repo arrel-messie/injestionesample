@@ -34,37 +34,30 @@ _build_transforms_spec() {
     }' '{"transforms":[],"filter":null}'
 }
 
-# Load index spec from schema.json
+# Load index spec from schema.json (consolidated)
 _load_index_spec() {
     local schema_file="$1"
-    export INDEX_SPEC_BITMAP_TYPE="$(jq -r '.indexSpec.bitmapType // "roaring"' "$schema_file" 2>/dev/null || echo "roaring")"
-    export INDEX_SPEC_DIMENSION_COMPRESSION="$(jq -r '.indexSpec.dimensionCompression // "lz4"' "$schema_file" 2>/dev/null || echo "lz4")"
-    export INDEX_SPEC_METRIC_COMPRESSION="$(jq -r '.indexSpec.metricCompression // "lz4"' "$schema_file" 2>/dev/null || echo "lz4")"
-    export INDEX_SPEC_LONG_ENCODING="$(jq -r '.indexSpec.longEncoding // "longs"' "$schema_file" 2>/dev/null || echo "longs")"
+    eval "$(jq -r '.indexSpec | to_entries[] | "export INDEX_SPEC_\(.key | ascii_upcase)=\"\(.value)\""' "$schema_file" 2>/dev/null || echo 'export INDEX_SPEC_BITMAP_TYPE="roaring" INDEX_SPEC_DIMENSION_COMPRESSION="lz4" INDEX_SPEC_METRIC_COMPRESSION="lz4" INDEX_SPEC_LONG_ENCODING="longs"')"
 }
 
-# Export template variables with defaults (using mapping table)
+# Export template variables from defaults.json
 _export_template_vars() {
-    local vars=(
-        "KAFKA_FETCH_MIN_BYTES:1048576" "KAFKA_FETCH_MAX_WAIT_MS:500" "KAFKA_MAX_POLL_RECORDS:500"
-        "KAFKA_SESSION_TIMEOUT_MS:30000" "KAFKA_HEARTBEAT_INTERVAL_MS:3000" "KAFKA_MAX_POLL_INTERVAL_MS:300000"
-        "KAFKA_AUTO_OFFSET_RESET:latest" "TASK_USE_EARLIEST_OFFSET:false" "TASK_USE_TRANSACTION:true"
-        "TASK_COUNT:10" "TASK_REPLICAS:2" "TASK_DURATION:PT1H" "TASK_START_DELAY:PT5S" "TASK_PERIOD:PT30S"
-        "TASK_COMPLETION_TIMEOUT:PT1H" "TASK_LATE_MESSAGE_REJECTION_PERIOD:PT1H" "TASK_POLL_TIMEOUT:100"
-        "TASK_MINIMUM_MESSAGE_TIME:1970-01-01T00:00:00.000Z" "TUNING_MAX_ROWS_IN_MEMORY:500000"
-        "TUNING_MAX_BYTES_IN_MEMORY:536870912" "TUNING_MAX_ROWS_PER_SEGMENT:5000000" "TUNING_MAX_PENDING_PERSISTS:2"
-        "TUNING_REPORT_PARSE_EXCEPTIONS:true" "TUNING_HANDOFF_CONDITION_TIMEOUT:900000"
-        "TUNING_RESET_OFFSET_AUTOMATICALLY:false" "TUNING_CHAT_RETRIES:8" "TUNING_HTTP_TIMEOUT:PT10S"
-        "TUNING_SHUTDOWN_TIMEOUT:PT80S" "TUNING_OFFSET_FETCH_PERIOD:PT30S" "TUNING_INTERMEDIATE_HANDOFF_PERIOD:P2147483647D"
-        "TUNING_LOG_PARSE_EXCEPTIONS:true" "TUNING_MAX_PARSE_EXCEPTIONS:10000" "TUNING_MAX_SAVED_PARSE_EXCEPTIONS:100"
-        "TUNING_SKIP_SEQUENCE_NUMBER_AVAILABILITY_CHECK:false" "TUNING_PARTITIONS_SPEC_TYPE:dynamic"
-        "TUNING_SECONDARY_PARTITION_DIMENSIONS:[]" "TUNING_TARGET_ROWS_PER_SEGMENT:5000000"
-        "TUNING_MAX_SPLIT_SIZE:1073741824" "TUNING_MAX_INPUT_SEGMENT_BYTES_PER_TASK:10737418240"
-    )
-    local var default
-    for entry in "${vars[@]}"; do
-        IFS=':' read -r var default <<< "$entry"
-        export "$var"="${!var:-$default}"
+    local defaults_file="${1:-}"
+    [ ! -f "$defaults_file" ] && return
+    
+    # Export kafka.* as KAFKA_*
+    jq -r '.kafka | to_entries[] | "export KAFKA_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "$key"="${!key:-$value}"
+    done
+    
+    # Export task.* as TASK_*
+    jq -r '.task | to_entries[] | "export TASK_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "$key"="${!key:-$value}"
+    done
+    
+    # Export tuning.* as TUNING_*
+    jq -r '.tuning | to_entries[] | "export TUNING_\(.key | ascii_upcase | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)") | gsub("(?<x>[a-z])(?<y>[A-Z])"; "\(.x)_\(.y)"))=\"\(.value)\""' "$defaults_file" 2>/dev/null | while IFS='=' read -r key value; do
+        [ -n "$key" ] && export "$key"="${!key:-$value}"
     done
 }
 
