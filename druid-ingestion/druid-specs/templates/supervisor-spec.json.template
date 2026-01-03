@@ -101,9 +101,9 @@
       "transformSpec": __TRANSFORM_SPEC__,
       "granularitySpec": {
         "type": "uniform",
-        "segmentGranularity": "${GRANULARITY_SEGMENT}",
-        "queryGranularity": "${GRANULARITY_QUERY}",
-        "rollup": ${GRANULARITY_ROLLUP},
+        "segmentGranularity": "${SEGMENT_GRANULARITY}",
+        "queryGranularity": "${QUERY_GRANULARITY}",
+        "rollup": ${ROLLUP},
         "intervals": null
       }
     }
