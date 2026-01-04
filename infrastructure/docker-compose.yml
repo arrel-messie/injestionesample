@@ -1,4 +1,5 @@
 # Infra file to simulate data ingestion  on druid to kafka
+name: infra
 volumes:
   middle_var: {}
   historical_var: {}
@@ -7,6 +8,9 @@ volumes:
   router_var: {}
   druid_shared: {}
   kafka-data: {}
+  gitlab_config: {}
+  gitlab_logs: {}
+  gitlab_data: {}
 
 networks:
   druid_network:
@@ -16,7 +20,6 @@ networks:
     name: resource-network
 
 services:
-  # Need 3.5 or later for container nodes
   zookeeper:
     container_name: zookeeper
     image: zookeeper:3.5.10
@@ -165,25 +168,25 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # Mode avec Zookeeper (plus stable)
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      # Development configuration
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     volumes:
       - kafka-data:/var/lib/kafka/data
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     networks:
       - druid_network
       - resource_network
@@ -193,32 +196,32 @@ services:
       timeout: 5s
       retries: 5
 
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
-    hostname: schema-registry
-    container_name: schema-registry
-    depends_on:
-      kafka:
-        condition: service_healthy
-      zookeeper:
-        condition: service_healthy
-    ports:
-      - "8085:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
-      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - druid_network
-      - resource_network
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+#  schema-registry:
+#    image: confluentinc/cp-schema-registry:7.5.0
+#    hostname: schema-registry
+#    container_name: schema-registry
+#    depends_on:
+#      kafka:
+#        condition: service_healthy
+#      zookeeper:
+#        condition: service_healthy
+#    ports:
+#      - "8085:8081"
+#    environment:
+#      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+#      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+#      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+#      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+#      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+#    networks:
+#      - druid_network
+#      - resource_network
+#    healthcheck:
+#      test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    restart: unless-stopped
 
   akhq:
     image: tchiotludo/akhq:latest
@@ -227,8 +230,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      schema-registry:
-        condition: service_healthy
+#      schema-registry:
+#        condition: service_healthy
     ports:
       - "8084:8080"
     environment:
@@ -238,9 +241,6 @@ services:
             docker-kafka:
               properties:
                 bootstrap.servers: "kafka:29092"
-              schema-registry:
-                url: "http://schema-registry:8081"
-                type: "confluent"
           server:
             access-log:
               enabled: false
@@ -287,4 +287,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: resources_gitlab
+    hostname: gitlab.localhost
+    ports:
+      - "${GITLAB_HTTP_PORT:-8080}:80"
+      - "${GITLAB_HTTPS_PORT:-8443}:443"
+      - "${GITLAB_SSH_PORT:-2222}:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.localhost'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-MyVeryStr0ng!Pass2024}'
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - druid_network
+      - resource_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/-/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 

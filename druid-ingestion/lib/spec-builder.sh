@@ -39,6 +39,10 @@ _load_schema() {
     METRICS_SPEC=$(jq -c '.metrics // []' "$schema")
     TRANSFORMS_SPEC=$(jq -c '{transforms: ((.transforms // []) | map({type: "expression", name, expression})), filter: null}' "$schema")
     eval "$(jq -r '.indexSpec // {} | to_entries[] | "export INDEX_SPEC_\(.key | ascii_upcase)=\(.value | @sh)"' "$schema")"
+    export INDEX_SPEC_BITMAPTYPE="${INDEX_SPEC_BITMAPTYPE:-roaring}"
+    export INDEX_SPEC_DIMENSIONCOMPRESSION="${INDEX_SPEC_DIMENSIONCOMPRESSION:-lz4}"
+    export INDEX_SPEC_METRICCOMPRESSION="${INDEX_SPEC_METRICCOMPRESSION:-lz4}"
+    export INDEX_SPEC_LONGENCODING="${INDEX_SPEC_LONGENCODING:-longs}"
     export DIMENSIONS_SPEC METRICS_SPEC TRANSFORMS_SPEC
 }
 

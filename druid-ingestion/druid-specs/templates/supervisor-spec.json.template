@@ -74,19 +74,19 @@
       },
       "indexSpec": {
         "bitmap": {
-          "type": "${INDEX_SPEC_BITMAP_TYPE}"
+          "type": "${INDEX_SPEC_BITMAPTYPE}"
         },
-        "dimensionCompression": "${INDEX_SPEC_DIMENSION_COMPRESSION}",
-        "metricCompression": "${INDEX_SPEC_METRIC_COMPRESSION}",
-        "longEncoding": "${INDEX_SPEC_LONG_ENCODING}"
+        "dimensionCompression": "${INDEX_SPEC_DIMENSIONCOMPRESSION}",
+        "metricCompression": "${INDEX_SPEC_METRICCOMPRESSION}",
+        "longEncoding": "${INDEX_SPEC_LONGENCODING}"
       },
       "indexSpecForIntermediatePersists": {
         "bitmap": {
-          "type": "${INDEX_SPEC_BITMAP_TYPE}"
+          "type": "${INDEX_SPEC_BITMAPTYPE}"
         },
-        "dimensionCompression": "${INDEX_SPEC_DIMENSION_COMPRESSION}",
-        "metricCompression": "${INDEX_SPEC_METRIC_COMPRESSION}",
-        "longEncoding": "${INDEX_SPEC_LONG_ENCODING}"
+        "dimensionCompression": "${INDEX_SPEC_DIMENSIONCOMPRESSION}",
+        "metricCompression": "${INDEX_SPEC_METRICCOMPRESSION}",
+        "longEncoding": "${INDEX_SPEC_LONGENCODING}"
       }
     },
     "dataSchema": {

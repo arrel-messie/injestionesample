@@ -7,28 +7,16 @@ variables:
   PROTO_FILE: "schemas/proto/settlement_transaction.proto"
   PROTO_DESC_OUTPUT: "schemas/compiled/settlement_transaction.desc"
 
-# Build stage: Compile proto and generate spec
 build:
   stage: build
   image: alpine:latest
   before_script:
-    - apk add --no-cache bash curl jq yq python3 py3-pip protobuf protobuf-dev
-    - pip3 install pyyaml
+    - apk add --no-cache bash protobuf
     - chmod +x druid-ingestion.sh
   script:
-    # Compile protobuf descriptor
     - mkdir -p schemas/compiled
-    - protoc --descriptor_set_out="${PROTO_DESC_OUTPUT}" --proto_path=schemas/proto "${PROTO_FILE}"
-    - |
-      echo "✅ Protobuf descriptor compiled: ${PROTO_DESC_OUTPUT}"
-      ls -lh "${PROTO_DESC_OUTPUT}"
-    
-    # Generate supervisor spec for all environments
-    - |
-      for env in dev staging prod; do
-        echo "📦 Generating spec for environment: $env"
-        ./druid-ingestion.sh build -e "$env" || echo "⚠️ Failed to generate spec for $env"
-      done
+    - protoc --descriptor_set_out="${PROTO_DESC_OUTPUT}" --include_imports --proto_path=schemas/proto "${PROTO_FILE}"
+    - ./druid-ingestion.sh build -e dev
   artifacts:
     paths:
       - schemas/compiled/*.desc
@@ -39,123 +27,48 @@ build:
     - develop
     - merge_requests
 
-# Deploy to DEV
 deploy:dev:
   stage: deploy
-  image: alpine:latest
-  environment:
-    name: dev
-    url: ${DRUID_OVERLORD_URL_DEV}
+  dependencies:
+    - build
   before_script:
-    - apk add --no-cache bash curl jq yq python3 py3-pip aws-cli
-    - pip3 install pyyaml
-    - chmod +x druid-ingestion.sh
-    # Load environment-specific config
+    - test -f config/dev.env || exit 1
     - |
-      cat > config/dev.env << EOF
-      KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS_DEV}"
-      KAFKA_SECURITY_PROTOCOL="${KAFKA_SECURITY_PROTOCOL_DEV}"
-      KAFKA_SASL_MECHANISM="${KAFKA_SASL_MECHANISM_DEV}"
-      KAFKA_SASL_JAAS_CONFIG="${KAFKA_SASL_JAAS_CONFIG_DEV}"
-      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_DEV:-}"
-      KAFKA_TOPIC="${KAFKA_TOPIC_DEV}"
-      DRUID_URL="${DRUID_OVERLORD_URL_DEV}"
-      DATASOURCE="${DATASOURCE_NAME_DEV}"
-      PROTO_DESCRIPTOR_PATH="${PROTO_DESCRIPTOR_PATH_DEV}"
-      EOF
-  script:
-    # Upload descriptor to S3
-    - |
-      if [ -n "${S3_BUCKET_DEV}" ]; then
-        echo "📤 Uploading descriptor to S3: s3://${S3_BUCKET_DEV}/schemas/settlement_transaction.desc"
-        aws s3 cp "${PROTO_DESC_OUTPUT}" "s3://${S3_BUCKET_DEV}/schemas/settlement_transaction.desc" \
-          --region "${S3_REGION_DEV:-us-east-1}" || exit 1
-        echo "✅ Descriptor uploaded successfully"
+      if [ -n "${DRUID_URL_DEV}" ]; then
+        sed -i '' "s|^DRUID_URL=.*|DRUID_URL=${DRUID_URL_DEV}|" config/dev.env
       else
-        echo "⚠️ S3_BUCKET_DEV not set, skipping S3 upload"
+        sed -i '' 's|^DRUID_URL=.*|DRUID_URL="http://coordinator:8081"|' config/dev.env
       fi
-    
-    # Deploy supervisor spec
-    - echo "🚀 Deploying supervisor to Druid..."
-    - ./druid-ingestion.sh deploy -e dev
-    - echo "✅ Deployment completed"
+  script:
+    # Copie directe dans le volume (shell executor a accès au Docker de l'hôte)
+    - |
+      VOLUME_NAME=$(docker volume ls --format "{{.Name}}" | grep druid_shared | head -1)
+      if [ -n "$VOLUME_NAME" ]; then
+        docker run --rm \
+          --network druid-infra_default \
+          -v "$VOLUME_NAME:/opt/shared" \
+          -v $(pwd)/schemas/compiled:/source:ro \
+          alpine:latest sh -c "mkdir -p /opt/shared/schemas && cp /source/*.desc /opt/shared/schemas/"
+      else
+        echo "ERROR: druid_shared volume not found"
+        exit 1
+      fi
+    # Déploiement via le réseau Compose
+    - |
+      source config/dev.env
+      docker run --rm \
+        --network druid-infra_default \
+        -v $(pwd):/workspace \
+        -w /workspace \
+        -e DRUID_URL \
+        alpine:latest sh -c "
+          apk add --no-cache bash curl jq gettext
+          chmod +x druid-ingestion.sh
+          ./druid-ingestion.sh deploy -e dev
+        "
   only:
     - main
     - develop
   when: manual
-  allow_failure: false
-
-# Deploy to STAGING
-deploy:staging:
-  stage: deploy
-  image: alpine:latest
-  environment:
-    name: staging
-    url: ${DRUID_OVERLORD_URL_STAGING}
-  before_script:
-    - apk add --no-cache bash curl jq yq python3 py3-pip aws-cli
-    - pip3 install pyyaml
-    - chmod +x druid-ingestion.sh
-    - |
-      cat > config/staging.env << EOF
-      KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS_STAGING}"
-      KAFKA_SECURITY_PROTOCOL="${KAFKA_SECURITY_PROTOCOL_STAGING}"
-      KAFKA_SASL_MECHANISM="${KAFKA_SASL_MECHANISM_STAGING}"
-      KAFKA_SASL_JAAS_CONFIG="${KAFKA_SASL_JAAS_CONFIG_STAGING}"
-      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_STAGING:-}"
-      KAFKA_TOPIC="${KAFKA_TOPIC_STAGING}"
-      DRUID_URL="${DRUID_OVERLORD_URL_STAGING}"
-      DATASOURCE="${DATASOURCE_NAME_STAGING}"
-      PROTO_DESCRIPTOR_PATH="${PROTO_DESCRIPTOR_PATH_STAGING}"
-      EOF
-  script:
-    - |
-      if [ -n "${S3_BUCKET_STAGING}" ]; then
-        echo "📤 Uploading descriptor to S3: s3://${S3_BUCKET_STAGING}/schemas/settlement_transaction.desc"
-        aws s3 cp "${PROTO_DESC_OUTPUT}" "s3://${S3_BUCKET_STAGING}/schemas/settlement_transaction.desc" \
-          --region "${S3_REGION_STAGING:-us-east-1}" || exit 1
-        echo "✅ Descriptor uploaded successfully"
-      fi
-    - ./druid-ingestion.sh deploy -e staging
-  only:
-    - main
-  when: manual
-  allow_failure: false
-
-# Deploy to PROD
-deploy:prod:
-  stage: deploy
-  image: alpine:latest
-  environment:
-    name: production
-    url: ${DRUID_OVERLORD_URL_PROD}
-  before_script:
-    - apk add --no-cache bash curl jq yq python3 py3-pip aws-cli
-    - pip3 install pyyaml
-    - chmod +x druid-ingestion.sh
-    - |
-      cat > config/prod.env << EOF
-      KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS_PROD}"
-      KAFKA_SECURITY_PROTOCOL="${KAFKA_SECURITY_PROTOCOL_PROD}"
-      KAFKA_SASL_MECHANISM="${KAFKA_SASL_MECHANISM_PROD}"
-      KAFKA_SASL_JAAS_CONFIG="${KAFKA_SASL_JAAS_CONFIG_PROD}"
-      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_PROD:-}"
-      KAFKA_TOPIC="${KAFKA_TOPIC_PROD}"
-      DRUID_URL="${DRUID_OVERLORD_URL_PROD}"
-      DATASOURCE="${DATASOURCE_NAME_PROD}"
-      PROTO_DESCRIPTOR_PATH="${PROTO_DESCRIPTOR_PATH_PROD}"
-      EOF
-  script:
-    - |
-      if [ -n "${S3_BUCKET_PROD}" ]; then
-        echo "📤 Uploading descriptor to S3: s3://${S3_BUCKET_PROD}/schemas/settlement_transaction.desc"
-        aws s3 cp "${PROTO_DESC_OUTPUT}" "s3://${S3_BUCKET_PROD}/schemas/settlement_transaction.desc" \
-          --region "${S3_REGION_PROD:-us-east-1}" || exit 1
-        echo "✅ Descriptor uploaded successfully"
-      fi
-    - ./druid-ingestion.sh deploy -e prod
-  only:
-    - main
-  when: manual
-  allow_failure: false
-
+  tags:
+    - shell  # ← Nouveau tag
