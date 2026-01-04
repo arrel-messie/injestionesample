@@ -73,7 +73,7 @@ cmd_compile_proto() {
     command -v protoc >/dev/null || error_exit "protoc not found. Install: brew install protobuf"
     
     mkdir -p "$(dirname "$output_file")"
-    protoc --descriptor_set_out="$output_file" --proto_path="$(dirname "$proto_file")" "$proto_file"
+    protoc --descriptor_set_out="$output_file" --include_imports --proto_path="$(dirname "$proto_file")" "$proto_file"
     [[ -f "$output_file" ]] || error_exit "Output not created: $output_file"
     echo "$output_file"
 }
